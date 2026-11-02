@@ -1,0 +1,44 @@
+name: Backup mingguan
+
+on:
+  schedule:
+    # Setiap Senin 01:00 UTC (08:00 WIB)
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Siapkan PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "Secret SUPABASE_DB_URL belum diisi."
+            exit 1
+          fi
+          STAMP=$(date -u +%Y-%m-%d)
+          mkdir -p backup
+          pg_dump "$SUPABASE_DB_URL" \
+            --no-owner \
+            --no-privileges \
+            --clean \
+            --if-exists \
+            --file="backup/presenex-${STAMP}.sql"
+          gzip -9 "backup/presenex-${STAMP}.sql"
+          ls -lh backup
+
+      - name: Simpan sebagai artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: presenex-backup-${{ github.run_id }}
+          path: backup/*.sql.gz
+          retention-days: 90
+          if-no-files-found: error
