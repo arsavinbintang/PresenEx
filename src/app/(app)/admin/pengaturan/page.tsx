@@ -1,17 +1,101 @@
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/queries/master";
+import { getAppSettings } from "@/lib/queries/master";
 import { PageHeader } from "@/components/ui/page-header";
 import { Flash } from "@/components/ui/flash";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ConfirmSubmit } from "@/components/ui/confirm-submit";
+import { ActionModal } from "@/components/ui/action-modal";
+import { Icon } from "@/components/ui/icons";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { BrandMark } from "@/components/ui/brand";
 import {
+  deleteSponsorAction,
   rebuildDailyAction,
+  removeLogoAction,
+  saveLogoAction,
   saveSettingsAction,
+  saveSponsorAction,
+  toggleSponsorAction,
 } from "@/lib/actions/admin";
+import { assetUrl } from "@/lib/utils/asset";
 import { addMonths, todayISO } from "@/lib/utils/tanggal";
 
 export const dynamic = "force-dynamic";
+
+function SponsorForm({
+  id,
+  sponsor,
+}: {
+  id?: string;
+  sponsor?: { nama: string; url: string | null; urutan: number };
+}) {
+  return (
+    <form action={saveSponsorAction} className="space-y-3">
+      {id ? <input type="hidden" name="id" value={id} /> : null}
+      <div>
+        <label className="label" htmlFor={`sponsor-nama-${id ?? "baru"}`}>
+          Nama sponsor
+        </label>
+        <input
+          id={`sponsor-nama-${id ?? "baru"}`}
+          name="nama"
+          className="input"
+          defaultValue={sponsor?.nama ?? ""}
+          required
+          maxLength={80}
+          placeholder="PT Maju Jaya"
+        />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor={`sponsor-url-${id ?? "baru"}`}>
+            Tautan (opsional)
+          </label>
+          <input
+            id={`sponsor-url-${id ?? "baru"}`}
+            name="url"
+            className="input"
+            defaultValue={sponsor?.url ?? ""}
+            placeholder="https://..."
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor={`sponsor-urutan-${id ?? "baru"}`}>
+            Urutan
+          </label>
+          <input
+            id={`sponsor-urutan-${id ?? "baru"}`}
+            name="urutan"
+            type="number"
+            min={0}
+            className="input"
+            defaultValue={sponsor?.urutan ?? 0}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="label" htmlFor={`sponsor-gambar-${id ?? "baru"}`}>
+          Logo {id ? "(kosongkan bila tidak diganti)" : ""}
+        </label>
+        <input
+          id={`sponsor-gambar-${id ?? "baru"}`}
+          name="gambar"
+          type="file"
+          accept="image/*"
+          className="input"
+          required={!id}
+        />
+        <p className="muted mt-1 text-xs">
+          PNG, JPG, WEBP, atau SVG. Maksimal 1,5 MB.
+        </p>
+      </div>
+      <SubmitButton className="btn btn-primary">
+        {id ? "Simpan perubahan" : "Tambah sponsor"}
+      </SubmitButton>
+    </form>
+  );
+}
 
 export default async function PengaturanPage({
   searchParams,
@@ -20,9 +104,23 @@ export default async function PengaturanPage({
 }) {
   const params = await searchParams;
   await requireAdmin();
+  const settings = await getAppSettings();
   const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const { data: semuaSponsor } = await supabase
+    .from("sponsors")
+    .select("id,nama,url,urutan,path,is_active")
+    .order("urutan")
+    .order("created_at");
+  const daftarSponsor = (semuaSponsor ?? []) as Array<{
+    id: string;
+    nama: string;
+    url: string | null;
+    urutan: number;
+    path: string;
+    is_active: boolean;
+  }>;
   const today = todayISO(settings?.timezone ?? "Asia/Jakarta");
+  const logoUrl = assetUrl(settings?.logo_path);
 
   return (
     <div>
@@ -97,6 +195,26 @@ export default async function PengaturanPage({
                 defaultValue={settings?.backup_drive_folder_id ?? ""}
                 placeholder="ID folder Drive"
               />
+            </div>
+            <div>
+              <label className="label" htmlFor="tema">
+                Tema bawaan
+              </label>
+              <select
+                id="tema"
+                name="tema"
+                className="select"
+                defaultValue={settings?.tema ?? "auto"}
+              >
+                <option value="auto">Ikut sistem perangkat</option>
+                <option value="light">Mode terang</option>
+                <option value="dark">Mode gelap</option>
+              </select>
+              <p className="muted mt-1 text-xs">
+                Berlaku untuk semua pengguna. Tiap pengguna tetap bisa
+                mengganti sendiri lewat tombol tema.{" "}
+                <ThemeToggle className="btn btn-ghost btn-sm inline-flex align-middle" />
+              </p>
             </div>
           </div>
         </section>
@@ -202,6 +320,170 @@ export default async function PengaturanPage({
           Simpan pengaturan
         </SubmitButton>
       </form>
+
+      <section className="card mt-6 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="section-title !mb-0">Logo aplikasi</h2>
+            <p className="muted mt-1 text-xs">
+              Tampil di sidebar, header, dan halaman login. Maksimal 1,5 MB
+              (PNG/JPG/WEBP/SVG).
+            </p>
+          </div>
+          <span
+            className="flex h-12 w-12 items-center justify-center rounded-xl border"
+            aria-hidden
+          >
+            <BrandMark settings={settings} size="md" />
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <form action={saveLogoAction} className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="label" htmlFor="logo">
+                File logo baru
+              </label>
+              <input
+                id="logo"
+                name="logo"
+                type="file"
+                accept="image/*"
+                className="input"
+                required
+              />
+            </div>
+            <SubmitButton className="btn btn-primary">
+              <Icon name="upload" className="h-4 w-4" />
+              {logoUrl ? "Ganti logo" : "Unggah logo"}
+            </SubmitButton>
+          </form>
+
+          {logoUrl ? (
+            <form action={removeLogoAction}>
+              <ConfirmSubmit
+                className="btn btn-ghost"
+                message="Kembalikan logo ke tampilan bawaan PresenEx?"
+              >
+                Kembalikan bawaan
+              </ConfirmSubmit>
+            </form>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="card mt-6 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="section-title !mb-0">Logo sponsor</h2>
+            <p className="muted mt-1 text-xs">
+              Tampil di halaman login. Tambahkan sebanyak apa pun, atur
+              urutannya, sembunyikan tanpa menghapus, atau hapus permanen.
+            </p>
+          </div>
+          <ActionModal
+            label="Tambah sponsor"
+            title="Tambah logo sponsor"
+            hint="Unggah gambar logo sponsor milik Anda sendiri."
+            icon="image"
+          >
+            <SponsorForm />
+          </ActionModal>
+        </div>
+
+        {daftarSponsor.length === 0 ? (
+          <p className="muted text-sm">
+            Belum ada sponsor. Tekan Tambah sponsor untuk mengunggah logo
+            pertama.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {daftarSponsor.map((sponsor) => {
+              const url = assetUrl(sponsor.path);
+              return (
+                <li
+                  key={sponsor.id}
+                  className="flex flex-wrap items-center gap-3 rounded-xl border p-3"
+                  style={sponsor.is_active ? undefined : { opacity: 0.55 }}
+                >
+                  <span className="flex h-11 w-14 shrink-0 items-center justify-center rounded-lg border bg-white">
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={url}
+                        alt={sponsor.nama}
+                        className="h-full w-full object-contain p-1"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Icon name="image" className="h-4 w-4 text-[var(--muted)]" />
+                    )}
+                  </span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {sponsor.nama}
+                    </span>
+                    <span className="muted block text-xs">
+                      Urutan {sponsor.urutan}
+                      {sponsor.url ? ` · ${sponsor.url}` : ""}
+                    </span>
+                  </span>
+
+                  <span
+                    className={
+                      sponsor.is_active ? "badge badge-hadir" : "badge badge-muted"
+                    }
+                  >
+                    {sponsor.is_active ? "Tampil" : "Disembunyikan"}
+                  </span>
+
+                  <span className="flex items-center gap-1.5">
+                    <ActionModal
+                      label="Ubah"
+                      title={`Ubah sponsor ${sponsor.nama}`}
+                      icon="edit"
+                      className="btn btn-ghost btn-sm"
+                    >
+                      <SponsorForm
+                        id={sponsor.id}
+                        sponsor={{
+                          nama: sponsor.nama,
+                          url: sponsor.url,
+                          urutan: sponsor.urutan,
+                        }}
+                      />
+                    </ActionModal>
+
+                    <form action={toggleSponsorAction}>
+                      <input type="hidden" name="id" value={sponsor.id} />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={sponsor.is_active ? "0" : "1"}
+                      />
+                      <button type="submit" className="btn btn-ghost btn-sm">
+                        {sponsor.is_active ? "Sembunyikan" : "Tampilkan"}
+                      </button>
+                    </form>
+
+                    <form action={deleteSponsorAction}>
+                      <input type="hidden" name="id" value={sponsor.id} />
+                      <ConfirmSubmit
+                        className="btn btn-ghost btn-sm !text-[var(--alpha)]"
+                        title="Hapus sponsor"
+                        message={`Hapus logo sponsor ${sponsor.nama}? File gambarnya ikut dihapus.`}
+                      >
+                        <Icon name="trash" className="h-4 w-4" />
+                      </ConfirmSubmit>
+                    </form>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="card mt-6 p-4">
         <h2 className="section-title mb-2">Hitung ulang ringkasan harian</h2>

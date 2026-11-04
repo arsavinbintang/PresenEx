@@ -11,6 +11,8 @@ export interface Profile {
   created_at: string;
 }
 
+export type Tema = "auto" | "light" | "dark";
+
 export interface AppSettings {
   id: boolean;
   nama_sekolah: string;
@@ -24,7 +26,20 @@ export interface AppSettings {
   label_sakit: string;
   label_alpha: string;
   backup_drive_folder_id: string | null;
+  tema: Tema;
+  logo_path: string | null;
+  login_banner_path: string | null;
   updated_at: string;
+}
+
+export interface Sponsor {
+  id: string;
+  nama: string;
+  url: string | null;
+  urutan: number;
+  path: string;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface TahunAjaran {

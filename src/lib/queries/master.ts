@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
+import { hasSupabaseEnv } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
 import { labelKelas } from "@/lib/utils/tanggal";
-import type { AppSettings, Kelas, TahunAjaran } from "@/types/db";
+import type { AppSettings, Kelas, Sponsor, TahunAjaran } from "@/types/db";
 
 export interface KelasInfo {
   id: string;
@@ -21,6 +24,39 @@ export async function getSettings(
     .maybeSingle();
   return (data as AppSettings | null) ?? null;
 }
+
+/**
+ * Versi ter-cache: satu request halaman yang memanggil berulang kali
+ * hanya memicu satu query. Ini membuat halaman terasa lebih ringan.
+ */
+export const getAppSettings = cache(
+  async (): Promise<AppSettings | null> => {
+    if (!hasSupabaseEnv()) return null;
+    const supabase = await createClient();
+    return getSettings(supabase);
+  },
+);
+
+export const getSponsors = cache(async (): Promise<Sponsor[]> => {
+  if (!hasSupabaseEnv()) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sponsors")
+    .select("id,nama,url,urutan,path,is_active,created_at")
+    .eq("is_active", true)
+    .order("urutan")
+    .order("created_at");
+  return (data as Sponsor[]) ?? [];
+});
+
+export const getActiveTahunAjaran = cache(
+  async (): Promise<TahunAjaran | null> => {
+    if (!hasSupabaseEnv()) return null;
+    const supabase = await createClient();
+    return getActiveTA(supabase);
+  },
+);
+
 
 export async function getActiveTA(
   supabase: SupabaseClient,

@@ -34,6 +34,10 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/pengaturan", label: "Pengaturan", icon: "settings" },
     ],
   },
+  {
+    title: "Bantuan",
+    items: [{ href: "/tutorial", label: "Tutorial", icon: "help" }],
+  },
 ];
 
 export const PIC_NAV: NavGroup[] = [
@@ -43,6 +47,7 @@ export const PIC_NAV: NavGroup[] = [
       { href: "/absen", label: "Absensi", icon: "absen" },
       { href: "/laporan", label: "Laporan", icon: "laporan" },
       { href: "/menu", label: "Menu", icon: "menu" },
+      { href: "/tutorial", label: "Tutorial", icon: "help" },
     ],
   },
 ];

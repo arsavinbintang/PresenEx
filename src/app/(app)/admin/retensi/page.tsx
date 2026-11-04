@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/queries/master";
+import { getAppSettings } from "@/lib/queries/master";
 import { PageHeader } from "@/components/ui/page-header";
 import { Flash } from "@/components/ui/flash";
 import { Empty } from "@/components/ui/empty";
@@ -37,7 +37,7 @@ export default async function RetensiPage({
   const params = await searchParams;
   await requireAdmin();
   const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const settings = await getAppSettings();
   const today = todayISO(settings?.timezone ?? "Asia/Jakarta");
   const cutoff = addMonths(today, -(settings?.purge_after_months ?? 3));
 

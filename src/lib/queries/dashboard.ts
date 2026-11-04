@@ -10,7 +10,7 @@ import {
   rangeMonths,
   todayISO,
 } from "@/lib/utils/tanggal";
-import { getActiveTA, getSettings } from "@/lib/queries/master";
+import { getAppSettings, getActiveTahunAjaran } from "@/lib/queries/master";
 import type { AttendanceDaily, Ekskul, EkskulJadwal } from "@/types/db";
 
 export interface TodaySession {
@@ -69,7 +69,7 @@ function scheduledDates(hari: number[], from: string, to: string): string[] {
 export async function getAdminDashboard(
   supabase: SupabaseClient,
 ): Promise<AdminDashboardData> {
-  const settings = await getSettings(supabase);
+  const settings = await getAppSettings();
   const timezone = settings?.timezone ?? "Asia/Jakarta";
   const today = todayISO(timezone);
   const start30 = addDays(today, -29);
@@ -102,7 +102,7 @@ export async function getAdminDashboard(
         .eq("status", "lulus")
         .eq("purge_hold", false)
         .lte("lulus_at", addMonths(today, -(settings?.purge_after_months ?? 3))),
-      getActiveTA(supabase),
+      getActiveTahunAjaran(),
     ]);
 
   const ekskul = (ekskulRes.data ?? []) as unknown as EkskulRow[];
@@ -241,15 +241,18 @@ export async function getPicDashboard(
   supabase: SupabaseClient,
   profileId: string,
 ): Promise<PicDashboardData> {
-  const settings = await getSettings(supabase);
+  const [settings, linksRes] = await Promise.all([
+    getAppSettings(),
+    supabase
+      .from("ekskul_pic")
+      .select("ekskul:ekskul_id(id,nama,is_active,ekskul_jadwal(hari))")
+      .eq("profile_id", profileId),
+  ]);
   const timezone = settings?.timezone ?? "Asia/Jakarta";
   const today = todayISO(timezone);
   const todayHari = isodow(today);
 
-  const { data: links } = await supabase
-    .from("ekskul_pic")
-    .select("ekskul:ekskul_id(id,nama,is_active,ekskul_jadwal(hari))")
-    .eq("profile_id", profileId);
+  const links = linksRes.data;
 
   const ekskul = ((links ?? []) as unknown as Array<{ ekskul: EkskulRow | null }>)
     .map((row) => row.ekskul)

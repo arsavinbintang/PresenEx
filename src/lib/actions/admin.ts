@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasServiceRoleEnv } from "@/lib/env";
 import { normalizeNama, normalizeNis, parseCsv } from "@/lib/utils/csv";
+import { sanitizeHex } from "@/lib/utils/format";
+import { ASSET_BUCKET, validateImageFile } from "@/lib/utils/asset";
 import { todayISO } from "@/lib/utils/tanggal";
 
 async function ensureAdmin() {
@@ -15,9 +17,19 @@ async function ensureAdmin() {
   return session;
 }
 
-function back(path: string, message: string, tone: "ok" | "error" = "ok"): never {
+function back(
+  path: string,
+  message: string,
+  tone: "ok" | "error" = "ok",
+  extra?: Record<string, string>,
+): never {
   const url = new URL(path, "http://local");
   url.searchParams.set(tone, message);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) url.searchParams.set(key, value);
+    }
+  }
   redirect(`${url.pathname}${url.search}`);
 }
 
@@ -44,8 +56,8 @@ export async function saveEkskulAction(formData: FormData): Promise<void> {
     p_id: id,
     p_nama: nama,
     p_hari: hari,
-    p_pic_ids: picIds,
-    p_primary: primary && picIds.includes(primary) ? primary : picIds[0] ?? null,
+    p_pics: picIds,
+    p_primary_pic: primary && picIds.includes(primary) ? primary : picIds[0] ?? null,
   });
 
   if (error) {
@@ -163,6 +175,46 @@ export async function saveJurusanAction(formData: FormData): Promise<void> {
   back("/admin/jurusan", id ? "Jurusan diperbarui." : "Jurusan ditambahkan.");
 }
 
+export async function deleteJurusanAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+
+  const { data: jurusan } = await supabase
+    .from("jurusan")
+    .select("id,kode")
+    .eq("id", id)
+    .maybeSingle();
+  if (!jurusan) back("/admin/jurusan", "Jurusan tidak ditemukan.", "error");
+
+  const { data: kelasRows } = await supabase
+    .from("kelas")
+    .select("id")
+    .eq("jurusan_id", id);
+  const kelasIds = (kelasRows ?? []).map((row) => row.id);
+
+  if (kelasIds.length > 0) {
+    const { count } = await supabase
+      .from("students")
+      .select("id", { count: "exact", head: true })
+      .in("kelas_id", kelasIds);
+    if ((count ?? 0) > 0) {
+      back(
+        "/admin/jurusan",
+        `Masih ada ${count} siswa pada kelas jurusan ini. Kosongkan kelasnya dulu.`,
+        "error",
+      );
+    }
+  }
+
+  const { error } = await supabase.from("jurusan").delete().eq("id", id);
+  if (error) back("/admin/jurusan", error.message, "error");
+
+  revalidatePath("/admin/jurusan");
+  revalidatePath("/admin/kelas");
+  back("/admin/jurusan", `Jurusan ${jurusan.kode} dihapus.`);
+}
+
 export async function generateKelasAction(formData: FormData): Promise<void> {
   await ensureAdmin();
   const supabase = await createClient();
@@ -208,6 +260,33 @@ export async function addKelasAction(formData: FormData): Promise<void> {
   back("/admin/kelas", "Kelas ditambahkan.");
 }
 
+export async function deleteKelasAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const ta = String(formData.get("ta") ?? "");
+
+  const { count } = await supabase
+    .from("students")
+    .select("id", { count: "exact", head: true })
+    .eq("kelas_id", id);
+
+  if ((count ?? 0) > 0) {
+    back(
+      `/admin/kelas${ta ? `?ta=${encodeURIComponent(ta)}` : ""}`,
+      `Kelas ini masih diisi ${count} siswa. Pindahkan siswa tersebut terlebih dahulu.`,
+      "error",
+    );
+  }
+
+  const { error } = await supabase.from("kelas").delete().eq("id", id);
+  if (error) back(`/admin/kelas`, error.message, "error");
+
+  revalidatePath("/admin/kelas");
+  revalidatePath("/admin/siswa");
+  back(`/admin/kelas${ta ? `?ta=${encodeURIComponent(ta)}` : ""}`, "Kelas dihapus.");
+}
+
 // =========================================================
 // SISWA
 // =========================================================
@@ -251,6 +330,32 @@ export async function saveSiswaAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/siswa");
   revalidatePath("/dashboard");
   back("/admin/siswa", id ? "Data siswa diperbarui." : "Siswa ditambahkan.");
+}
+
+export async function deleteSiswaAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const q = String(formData.get("q") ?? "").trim();
+
+  const { data: siswa } = await supabase
+    .from("students")
+    .select("id,nama,status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!siswa) back("/admin/siswa", "Siswa tidak ditemukan.", "error");
+
+  const { error } = await supabase.from("students").delete().eq("id", id);
+  if (error) back("/admin/siswa", error.message, "error");
+
+  revalidatePath("/admin/siswa");
+  revalidatePath("/dashboard");
+  back(
+    "/admin/siswa",
+    `Data ${siswa.nama} beserta riwayat absensinya dihapus.`,
+    "ok",
+    q ? { q } : undefined,
+  );
 }
 
 export interface ImportState {
@@ -456,12 +561,30 @@ export async function saveTahunAjaranAction(formData: FormData): Promise<void> {
   await ensureAdmin();
   const supabase = await createClient();
 
+  const id = String(formData.get("id") ?? "").trim() || null;
   const nama = String(formData.get("nama") ?? "").trim();
   const mulai = String(formData.get("mulai") ?? "");
   const selesai = String(formData.get("selesai") ?? "");
 
   if (!nama || !mulai || !selesai || selesai <= mulai) {
     back("/admin/tahun-ajaran", "Rentang tahun ajaran tidak valid.", "error");
+  }
+
+  if (id) {
+    const { error } = await supabase
+      .from("tahun_ajaran")
+      .update({ nama, mulai, selesai })
+      .eq("id", id);
+    if (error) {
+      back(
+        "/admin/tahun-ajaran",
+        error.code === "23505" ? "Nama tahun ajaran sudah ada." : error.message,
+        "error",
+      );
+    }
+    revalidatePath("/admin/tahun-ajaran");
+    revalidatePath("/dashboard");
+    back("/admin/tahun-ajaran", "Tahun ajaran diperbarui.");
   }
 
   const { count } = await supabase
@@ -485,6 +608,64 @@ export async function saveTahunAjaranAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/tahun-ajaran");
   back("/admin/tahun-ajaran", "Tahun ajaran dibuat.");
 }
+
+export async function deleteTahunAjaranAction(
+  formData: FormData,
+): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+
+  const { data: ta } = await supabase
+    .from("tahun_ajaran")
+    .select("id,nama,is_active")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!ta) back("/admin/tahun-ajaran", "Tahun ajaran tidak ditemukan.", "error");
+  if (ta.is_active) {
+    back(
+      "/admin/tahun-ajaran",
+      "Tahun ajaran ini sedang aktif. Aktifkan tahun ajaran lain sebelum menghapusnya.",
+      "error",
+    );
+  }
+
+  const { data: kelasRows } = await supabase
+    .from("kelas")
+    .select("id")
+    .eq("tahun_ajaran_id", id);
+  const kelasIds = (kelasRows ?? []).map((row) => row.id);
+
+  if (kelasIds.length > 0) {
+    const { count } = await supabase
+      .from("students")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "aktif")
+      .in("kelas_id", kelasIds);
+
+    if ((count ?? 0) > 0) {
+      back(
+        "/admin/tahun-ajaran",
+        `Masih ada ${count} siswa aktif di kelas tahun ajaran ini. Pindahkan atau luluskan siswa tersebut dulu.`,
+        "error",
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("tahun_ajaran")
+    .delete()
+    .eq("id", id);
+
+  if (error) back("/admin/tahun-ajaran", error.message, "error");
+
+  revalidatePath("/admin/tahun-ajaran");
+  revalidatePath("/admin/kelas");
+  revalidatePath("/admin/siswa");
+  back("/admin/tahun-ajaran", `Tahun ajaran ${ta.nama} dihapus.`);
+}
+
 
 export async function activateTahunAjaranAction(
   formData: FormData,
@@ -530,16 +711,17 @@ export async function rolloverAction(formData: FormData): Promise<void> {
   }
 
   const result = data as {
-    naik_kelas: number;
-    lulus: number;
+    siswa_naik_kelas: number;
+    siswa_lulus: number;
     anggota_disalin: number;
   };
 
   revalidatePath("/admin/tahun-ajaran");
   revalidatePath("/dashboard");
+  revalidatePath("/admin/retensi");
   back(
     "/admin/tahun-ajaran",
-    `Rollover selesai: ${result.naik_kelas} naik kelas, ${result.lulus} lulus, ${result.anggota_disalin} anggota disalin.`,
+    `Rollover selesai: ${result.siswa_naik_kelas} naik kelas, ${result.siswa_lulus} lulus, ${result.anggota_disalin} anggota disalin.`,
   );
 }
 
@@ -655,12 +837,20 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
   await ensureAdmin();
   const supabase = await createClient();
 
-  const payload = {
+  const editWindow = Number(formData.get("edit_window_months") ?? 6);
+  const purgeAfter = Number(formData.get("purge_after_months") ?? 3);
+
+  const payload: Record<string, unknown> = {
     nama_sekolah: String(formData.get("nama_sekolah") ?? "").trim(),
     timezone: String(formData.get("timezone") ?? "Asia/Jakarta"),
-    warna_aksen: String(formData.get("warna_aksen") ?? "#2563eb"),
-    edit_window_months: Number(formData.get("edit_window_months") ?? 6),
-    purge_after_months: Number(formData.get("purge_after_months") ?? 3),
+    warna_aksen: sanitizeHex(String(formData.get("warna_aksen") ?? "")),
+    tema: ["auto", "light", "dark"].includes(
+      String(formData.get("tema") ?? ""),
+    )
+      ? String(formData.get("tema"))
+      : "auto",
+    edit_window_months: editWindow,
+    purge_after_months: purgeAfter,
     purge_sheets: String(formData.get("purge_sheets") ?? "") === "1",
     label_hadir: String(formData.get("label_hadir") ?? "Hadir"),
     label_izin: String(formData.get("label_izin") ?? "Izin"),
@@ -672,10 +862,10 @@ export async function saveSettingsAction(formData: FormData): Promise<void> {
   };
 
   if (
-    payload.edit_window_months < 1 ||
-    payload.edit_window_months > 24 ||
-    payload.purge_after_months < 0 ||
-    payload.purge_after_months > 24
+    editWindow < 1 ||
+    editWindow > 24 ||
+    purgeAfter < 0 ||
+    purgeAfter > 24
   ) {
     back("/admin/pengaturan", "Nilai bulan di luar rentang yang diizinkan.", "error");
   }
@@ -794,4 +984,205 @@ export async function rebuildDailyAction(formData: FormData): Promise<void> {
   if (error) back("/admin/pengaturan", error.message, "error");
   revalidatePath("/dashboard");
   back("/admin/pengaturan", `${data ?? 0} baris ringkasan dihitung ulang.`);
+}
+
+// =========================================================
+// BRANDING: LOGO & SPONSOR
+// =========================================================
+async function uploadImage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  folder: string,
+  file: File,
+  prefix: string,
+): Promise<{ path: string } | { error: string }> {
+  const check = validateImageFile(file);
+  if (!check.ok) return { error: check.reason ?? "File tidak valid." };
+
+  const ext = (file.name.split(".").pop() ?? "png").toLowerCase();
+  const path = `${folder}/${prefix}-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from(ASSET_BUCKET)
+    .upload(path, file, {
+      upsert: false,
+      cacheControl: "31536000",
+      contentType: file.type,
+    });
+
+  if (error) return { error: `Gagal mengunggah: ${error.message}` };
+  return { path };
+}
+
+export async function saveLogoAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const file = formData.get("logo");
+
+  if (!(file instanceof File) || file.size === 0) {
+    back("/admin/pengaturan", "Pilih file logo terlebih dahulu.", "error");
+  }
+
+  const hasil = await uploadImage(supabase, "logo", file, "logo");
+  if ("error" in hasil) {
+    back("/admin/pengaturan", hasil.error, "error");
+  }
+
+  const { data: lama } = await supabase
+    .from("app_settings")
+    .select("logo_path")
+    .eq("id", true)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("app_settings")
+    .update({ logo_path: hasil.path, updated_at: new Date().toISOString() })
+    .eq("id", true);
+
+  if (error) back("/admin/pengaturan", error.message, "error");
+
+  if (lama?.logo_path) {
+    await supabase.storage.from(ASSET_BUCKET).remove([lama.logo_path]);
+  }
+
+  revalidatePath("/", "layout");
+  back("/admin/pengaturan", "Logo aplikasi diganti.");
+}
+
+export async function removeLogoAction(): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("app_settings")
+    .select("logo_path")
+    .eq("id", true)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("app_settings")
+    .update({ logo_path: null, updated_at: new Date().toISOString() })
+    .eq("id", true);
+
+  if (error) back("/admin/pengaturan", error.message, "error");
+  if (data?.logo_path) {
+    await supabase.storage.from(ASSET_BUCKET).remove([data.logo_path]);
+  }
+
+  revalidatePath("/", "layout");
+  back("/admin/pengaturan", "Logo dikembalikan ke bawaan.");
+}
+
+export async function saveSponsorAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+
+  const id = String(formData.get("id") ?? "").trim() || null;
+  const nama = String(formData.get("nama") ?? "").trim();
+  const url = String(formData.get("url") ?? "").trim() || null;
+  const urutan = Number(formData.get("urutan") ?? 0);
+  const file = formData.get("gambar");
+
+  if (!nama) back("/admin/pengaturan", "Nama sponsor wajib diisi.", "error");
+  if (url && !/^https?:\/\//i.test(url)) {
+    back("/admin/pengaturan", "URL sponsor harus diawali http:// atau https://", "error");
+  }
+
+  const kunci = id ?? Date.now().toString();
+  let path: string | null = null;
+
+  if (file instanceof File && file.size > 0) {
+    const hasil = await uploadImage(supabase, "sponsor", file, kunci);
+    if ("error" in hasil) back("/admin/pengaturan", hasil.error, "error");
+    path = hasil.path;
+  }
+
+  if (id) {
+    const payload: Record<string, unknown> = { nama, url, urutan };
+    if (path) payload.path = path;
+    const { data: lama } = await supabase
+      .from("sponsors")
+      .select("path")
+      .eq("id", id)
+      .maybeSingle();
+
+    const { error } = await supabase.from("sponsors").update(payload).eq("id", id);
+    if (error) back("/admin/pengaturan", error.message, "error");
+
+    if (path && lama?.path && lama.path !== path) {
+      await supabase.storage.from(ASSET_BUCKET).remove([lama.path]);
+    }
+  } else {
+    if (!path) {
+      back("/admin/pengaturan", "Pilih gambar logo sponsor.", "error");
+    }
+    const { error } = await supabase.from("sponsors").insert({
+      nama,
+      url,
+      urutan,
+      path: path,
+      is_active: true,
+    });
+    if (error) back("/admin/pengaturan", error.message, "error");
+  }
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/pengaturan");
+  revalidatePath("/login");
+  back("/admin/pengaturan", id ? "Sponsor diperbarui." : "Sponsor ditambahkan.");
+}
+
+export async function toggleSponsorAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const active = String(formData.get("active") ?? "") === "1";
+
+  const { error } = await supabase
+    .from("sponsors")
+    .update({ is_active: active })
+    .eq("id", id);
+  if (error) back("/admin/pengaturan", error.message, "error");
+
+  revalidatePath("/", "layout");
+  revalidatePath("/login");
+  back(
+    "/admin/pengaturan",
+    active ? "Sponsor ditampilkan." : "Sponsor disembunyikan.",
+  );
+}
+
+export async function deleteSponsorAction(formData: FormData): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+
+  const { data } = await supabase
+    .from("sponsors")
+    .select("id,nama,path")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) back("/admin/pengaturan", "Sponsor tidak ditemukan.", "error");
+
+  const { error } = await supabase.from("sponsors").delete().eq("id", id);
+  if (error) back("/admin/pengaturan", error.message, "error");
+
+  await supabase.storage.from(ASSET_BUCKET).remove([data.path]);
+
+  revalidatePath("/", "layout");
+  revalidatePath("/login");
+  back("/admin/pengaturan", `Sponsor ${data.nama} dihapus.`);
+}
+
+export async function deleteSheetConfigAction(
+  formData: FormData,
+): Promise<void> {
+  await ensureAdmin();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+
+  const { error } = await supabase.from("sheet_config").delete().eq("id", id);
+  if (error) back("/admin/sinkronisasi", error.message, "error");
+
+  revalidatePath("/admin/sinkronisasi");
+  back("/admin/sinkronisasi", "Konfigurasi spreadsheet dihapus.");
 }

@@ -7,8 +7,6 @@
   --foreground: #16181d;
   --muted: #667085;
   --border: #e3e6eb;
-  --accent: #2563eb;
-  --accent-soft: #eff4ff;
   --hadir: #12805c;
   --hadir-soft: #e6f6ef;
   --izin: #1d63d1;
@@ -21,15 +19,13 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #0e1014;
     --surface: #16191f;
     --surface-2: #1d2129;
     --foreground: #eceef2;
     --muted: #98a2b3;
     --border: #262b34;
-    --accent: #4d8bff;
-    --accent-soft: #17233a;
     --hadir: #4ade9a;
     --hadir-soft: #12291f;
     --izin: #7aa7ff;
@@ -38,6 +34,54 @@
     --sakit-soft: #2b2111;
     --alpha: #ff8a7d;
     --alpha-soft: #2e1714;
+  }
+}
+
+/* Dipaksa oleh pemilih tema (data-theme="dark" / "light") — menimpa media query. */
+:root[data-theme="dark"] {
+  --background: #0e1014;
+  --surface: #16191f;
+  --surface-2: #1d2129;
+  --foreground: #eceef2;
+  --muted: #98a2b3;
+  --border: #262b34;
+  --hadir: #4ade9a;
+  --hadir-soft: #12291f;
+  --izin: #7aa7ff;
+  --izin-soft: #16213a;
+  --sakit: #f5b95c;
+  --sakit-soft: #2b2111;
+  --alpha: #ff8a7d;
+  --alpha-soft: #2e1714;
+}
+
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+  }
+}
+
+/* Warna aksen dipilih admin: terang untuk mode terang, diterangkan untuk mode gelap. */
+:root {
+  --accent: var(--accent-light, #2563eb);
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+:root[data-theme="dark"] {
+  --accent: var(--accent-dark, #4d8bff);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accent: var(--accent-dark, #4d8bff);
   }
 }
 

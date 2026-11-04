@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { listEkskulForUser } from "@/lib/queries/absensi";
-import { getActiveTA, getSettings } from "@/lib/queries/master";
+import { getAppSettings, getActiveTahunAjaran } from "@/lib/queries/master";
 import { PageHeader } from "@/components/ui/page-header";
 import { Empty } from "@/components/ui/empty";
 import { Icon } from "@/components/ui/icons";
@@ -31,8 +31,8 @@ export default async function LaporanPage({
   const supabase = await createClient();
 
   const [settings, activeTA] = await Promise.all([
-    getSettings(supabase),
-    getActiveTA(supabase),
+    getAppSettings(),
+    getActiveTahunAjaran(),
   ]);
   const today = todayISO(settings?.timezone ?? "Asia/Jakarta");
 

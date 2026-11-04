@@ -21,7 +21,15 @@ dicadangkan ke Google Sheets; kalau Sheets gagal, absensi tetap tersimpan.
 - Retensi otomatis: data pribadi + absensi siswa lulus dihapus setelah 3 bulan
   (bisa diatur), ringkasan harian tetap disimpan.
 - Laporan per ekskul + ekspor CSV, pencarian siswa, impor CSV.
-- Tema terang/gelap mengikuti sistem, navigasi bawah di HP dan sidebar di laptop.
+- **CRUD penuh** untuk tahun ajaran (buat, ubah, aktifkan, hapus), jurusan,
+  kelas, siswa, pengguna, ekskul, dan sponsor.
+- **Tutorial** di `/tutorial`: isi lengkap untuk admin (semua fitur + cara
+  mendapatkan Spreadsheet ID) dan panduan khusus PIC bila yang masuk PIC.
+- **Tema terang/gelap** bisa diatur sendiri tiap pengguna (ikut sistem, terang,
+  gelap) atau diatur bawaan oleh admin.
+- **Logo sekolah & logo sponsor** diunggah sendiri lewat Pengaturan, jumlah
+  sponsor tidak dibatasi, dan tampil di halaman login.
+- Tema mengikuti sistem, navigasi bawah di HP dan sidebar di laptop.
 
 ## Teknologi
 
@@ -36,11 +44,13 @@ dicadangkan ke Google Sheets; kalau Sheets gagal, absensi tetap tersimpan.
 ```
 supabase/migrations/0001_init.sql   skema, RLS, trigger, fungsi baca
 supabase/migrations/0002_rpc.sql    RPC tulis + rollover + retensi + grant
+supabase/migrations/0003_branding.sql  tema, logo, sponsor, bucket storage
 src/lib/actions/                    server action (admin & absensi)
 src/lib/queries/                    query baca per halaman
 src/lib/sheets/sync.ts              sinkronisasi Google Sheets
 src/app/api/cron/daily/route.ts     cron harian (retry + retensi)
 src/app/(app)/                      semua halaman setelah login
+src/app/(app)/tutorial/             tutorial admin & PIC
 scripts/seed-admin.mjs              pembuat admin pertama
 ```
 
@@ -50,6 +60,7 @@ scripts/seed-admin.mjs              pembuat admin pertama
 2. Buka **SQL Editor**, jalankan isi file berikut **berurutan**:
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_rpc.sql`
+   - `supabase/migrations/0003_branding.sql` (tema, logo, sponsor, storage)
 3. Ambil kredensial di **Project Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -207,6 +218,13 @@ npm run seed:admin  # buat/perbarui admin pertama
 - **Dashboard** memakai `attendance_daily` (agregat) agar tetap cepat walau data
   absensi besar. Bila angka terlihat tidak cocok setelah perubahan manual,
   jalankan **Pengaturan → Hitung ulang ringkasan harian**.
+- **Logo & sponsor** disimpan di bucket Storage `presenex-assets` (dibuat oleh
+  migrasi 0003). Berkas lama otomatis terhapus saat logo/sponsor diganti.
+- **Tema** disimpan di `app_settings.tema` sebagai bawaan, sedangkan pilihan
+  tiap pengguna disimpan di `localStorage` perangkat (`presenex.tema`).
+- **Tutorial** bisa dibuka lewat menu Bantuan → Tutorial. Admin melihat
+  panduan seluruh fitur (termasuk cara mendapatkan Spreadsheet ID), PIC
+  melihat panduan tugasnya.
 
 ## 10. Troubleshooting
 
@@ -219,6 +237,9 @@ npm run seed:admin  # buat/perbarui admin pertama
   diisi di server.
 - **Sheets 403** — spreadsheet belum dibagikan ke email service account, atau
   Google Sheets API belum diaktifkan.
+- **Logo/sponsor gagal diunggah** — jalankan `supabase/migrations/0003_branding.sql`
+  (bucket `presenex-assets` dan kebijakan penyimpanannya belum ada), lalu
+  periksa ukuran gambar (maksimal 1,5 MB).
 - **PIC tidak bisa koreksi** — sesi lebih tua dari `edit_window_months`. Admin
   tetap bisa mengubah.
 - **Rollover gagal** — pastikan ada tahun ajaran aktif dan kelas sudah dibuat.

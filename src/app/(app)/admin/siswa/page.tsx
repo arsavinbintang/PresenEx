@@ -2,22 +2,115 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import {
-  getActiveTA,
+  getActiveTahunAjaran,
   getKelasMap,
   listKelasOptions,
+  type KelasOption,
 } from "@/lib/queries/master";
 import { PageHeader } from "@/components/ui/page-header";
 import { Flash } from "@/components/ui/flash";
 import { Empty } from "@/components/ui/empty";
 import { Icon } from "@/components/ui/icons";
+import { ActionModal } from "@/components/ui/action-modal";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 import { ImportSiswaForm } from "@/components/admin/import-siswa-form";
-import { saveSiswaAction } from "@/lib/actions/admin";
+import { deleteSiswaAction, saveSiswaAction } from "@/lib/actions/admin";
 import type { Student } from "@/types/db";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
+
+/** Formulir tambah/ubah siswa. Dipakai di modal (tambah) dan panel (ubah). */
+function SiswaForm({
+  kelasOptions,
+  editStudent,
+}: {
+  kelasOptions: KelasOption[];
+  editStudent?: Student | null;
+}) {
+  return (
+    <form action={saveSiswaAction} className="space-y-3">
+      {editStudent ? (
+        <input type="hidden" name="id" value={editStudent.id} />
+      ) : null}
+
+      <div>
+        <label className="label" htmlFor="nama">
+          Nama lengkap
+        </label>
+        <input
+          id="nama"
+          name="nama"
+          className="input"
+          defaultValue={editStudent?.nama ?? ""}
+          required
+          maxLength={100}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label" htmlFor="nis">
+            NIS (opsional)
+          </label>
+          <input
+            id="nis"
+            name="nis"
+            className="input"
+            defaultValue={editStudent?.nis ?? ""}
+            maxLength={30}
+            placeholder="Unik untuk siswa aktif"
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="status">
+            Status
+          </label>
+          <select
+            id="status"
+            name="status"
+            defaultValue={editStudent?.status ?? "aktif"}
+            className="select"
+          >
+            <option value="aktif">Aktif</option>
+            <option value="lulus">Lulus</option>
+            <option value="keluar">Keluar</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="label" htmlFor="kelas_id">
+          Kelas
+        </label>
+        <select
+          id="kelas_id"
+          name="kelas_id"
+          defaultValue={editStudent?.kelas_id ?? ""}
+          className="select"
+        >
+          <option value="">Tanpa kelas</option>
+          {kelasOptions.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {kelasOptions.length === 0 ? (
+          <p className="muted mt-1 text-xs">
+            Belum ada kelas. Buat lewat menu Kelas.
+          </p>
+        ) : null}
+      </div>
+
+      <SubmitButton className="btn btn-primary w-full sm:w-auto">
+        {editStudent ? "Simpan perubahan" : "Tambah siswa"}
+      </SubmitButton>
+    </form>
+  );
+}
 
 function sanitizeQuery(value: string): string {
   return value.replace(/[,()%*\\]/g, " ").trim();
@@ -42,21 +135,6 @@ export default async function SiswaPage({
   const page = Math.max(1, Number(params.page ?? 1) || 1);
   const from = (page - 1) * PAGE_SIZE;
 
-  const activeTA = await getActiveTA(supabase);
-  const [kelasOptions, kelasMap, editRes] = await Promise.all([
-    listKelasOptions(supabase, activeTA?.id ?? null),
-    getKelasMap(supabase),
-    params.edit
-      ? supabase
-          .from("students")
-          .select("*")
-          .eq("id", params.edit)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
-
-  const editStudent = (editRes.data as Student | null) ?? null;
-
   let query = supabase
     .from("students")
     .select("id,nama,nis,kelas_id,status,created_at", { count: "exact" })
@@ -68,7 +146,25 @@ export default async function SiswaPage({
     query = query.or(`nama.ilike.%${q}%,nis.ilike.%${q}%`);
   }
 
-  const { data, count, error } = await query;
+  const [activeTA, kelasMap, editRes, studentRes] = await Promise.all([
+    getActiveTahunAjaran(),
+    getKelasMap(supabase),
+    params.edit
+      ? supabase
+          .from("students")
+          .select("*")
+          .eq("id", params.edit)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    query,
+  ]);
+
+  // Opsi kelas bergantung pada tahun ajaran aktif, jadi diambil setelahnya.
+  const kelasOptions = await listKelasOptions(supabase, activeTA?.id ?? null);
+
+  const editStudent = (editRes.data as Student | null) ?? null;
+
+  const { data, count, error } = studentRes;
   const students = (data ?? []) as Array<
     Pick<Student, "id" | "nama" | "nis" | "kelas_id" | "status">
   >;
@@ -88,10 +184,12 @@ export default async function SiswaPage({
         title="Siswa"
         description={`${total} siswa aktif${activeTA ? ` · TA ${activeTA.nama}` : ""}`}
         action={
-          <a href="#tambah" className="btn btn-primary btn-sm">
-            <Icon name="plus" className="h-4 w-4" />
-            Tambah
-          </a>
+          <ActionModal
+            title="Tambah siswa"
+            hint="NIS wajib unik di antara siswa aktif. NIS boleh dikosongkan."
+          >
+            <SiswaForm kelasOptions={kelasOptions} />
+          </ActionModal>
         }
       />
 
@@ -215,100 +313,38 @@ export default async function SiswaPage({
       )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <section id="tambah" className="card scroll-mt-20 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="section-title">
-              {editStudent ? "Ubah data siswa" : "Tambah siswa"}
-            </h2>
-            {editStudent ? (
+        {editStudent ? (
+          <section className="card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="section-title">Ubah data siswa</h2>
               <Link
                 href="/admin/siswa"
                 className="text-xs font-semibold text-[var(--accent)] hover:underline"
               >
                 Batal
               </Link>
-            ) : null}
-          </div>
+            </div>
 
-          <form action={saveSiswaAction} className="space-y-3">
-            {editStudent ? (
+            <SiswaForm kelasOptions={kelasOptions} editStudent={editStudent} />
+
+            <form
+              action={deleteSiswaAction}
+              className="mt-4 border-t pt-3"
+            >
               <input type="hidden" name="id" value={editStudent.id} />
-            ) : null}
-
-            <div>
-              <label className="label" htmlFor="nama">
-                Nama lengkap
-              </label>
-              <input
-                id="nama"
-                name="nama"
-                className="input"
-                defaultValue={editStudent?.nama ?? ""}
-                required
-                maxLength={100}
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label" htmlFor="nis">
-                  NIS (opsional)
-                </label>
-                <input
-                  id="nis"
-                  name="nis"
-                  className="input"
-                  defaultValue={editStudent?.nis ?? ""}
-                  maxLength={30}
-                  placeholder="Unik untuk siswa aktif"
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="status">
-                  Status
-                </label>
-                <select
-                  id="status"
-                  name="status"
-                  defaultValue={editStudent?.status ?? "aktif"}
-                  className="select"
-                >
-                  <option value="aktif">Aktif</option>
-                  <option value="lulus">Lulus</option>
-                  <option value="keluar">Keluar</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="kelas_id">
-                Kelas
-              </label>
-              <select
-                id="kelas_id"
-                name="kelas_id"
-                defaultValue={editStudent?.kelas_id ?? ""}
-                className="select"
+              {q ? <input type="hidden" name="q" value={q} /> : null}
+              <p className="muted mb-2 text-xs">
+                Menghapus siswa juga menghapus seluruh riwayat absensinya.
+              </p>
+              <ConfirmSubmit
+                message={`Hapus ${editStudent.nama} beserta riwayat absensinya? Tindakan ini tidak bisa dibatalkan.`}
               >
-                <option value="">Tanpa kelas</option>
-                {kelasOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              {kelasOptions.length === 0 ? (
-                <p className="muted mt-1 text-xs">
-                  Belum ada kelas. Buat lewat menu Kelas.
-                </p>
-              ) : null}
-            </div>
-
-            <SubmitButton className="btn btn-primary w-full sm:w-auto">
-              {editStudent ? "Simpan perubahan" : "Tambah siswa"}
-            </SubmitButton>
-          </form>
-        </section>
+                <Icon name="trash" className="h-4 w-4" />
+                Hapus siswa
+              </ConfirmSubmit>
+            </form>
+          </section>
+        ) : null}
 
         <section className="card p-4">
           <h2 className="section-title mb-3">Impor CSV</h2>

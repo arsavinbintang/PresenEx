@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth/session";
-import { createClient } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/queries/master";
+import { getAppSettings } from "@/lib/queries/master";
 import { logoutAction } from "@/lib/auth/actions";
 import { ADMIN_NAV, PIC_NAV } from "@/lib/nav";
 import { PageHeader } from "@/components/ui/page-header";
@@ -14,8 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
   const session = await requireSession();
-  const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const settings = await getAppSettings();
   const isAdmin = session.profile.role === "admin";
   const groups = (isAdmin ? ADMIN_NAV : PIC_NAV)
     .map((group) => ({

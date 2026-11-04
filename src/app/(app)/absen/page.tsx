@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { listEkskulForUser } from "@/lib/queries/absensi";
-import { getSettings } from "@/lib/queries/master";
+import { getAppSettings } from "@/lib/queries/master";
 import { PageHeader } from "@/components/ui/page-header";
 import { Empty } from "@/components/ui/empty";
 import { Icon } from "@/components/ui/icons";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function AbsenListPage() {
   const session = await requireSession();
   const supabase = await createClient();
-  const settings = await getSettings(supabase);
+  const settings = await getAppSettings();
   const today = todayISO(settings?.timezone ?? "Asia/Jakarta");
 
   const ekskul = await listEkskulForUser(

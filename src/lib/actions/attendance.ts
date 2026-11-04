@@ -30,6 +30,8 @@ const MESSAGES: Record<string, string> = {
   FUTURE_DATE: "Tanggal tidak boleh melewati hari ini.",
   EDIT_WINDOW_CLOSED:
     "Batas koreksi sudah terlewati. Hubungi admin untuk mengubah sesi ini.",
+  OUTSIDE_EDIT_WINDOW:
+    "Batas koreksi sudah terlewati. Hubungi admin untuk mengubah sesi ini.",
   INVALID_ENTRIES: "Data absensi tidak valid.",
   EMPTY_ROSTER: "Belum ada anggota aktif pada tanggal ini.",
   ROSTER_INCOMPLETE:
@@ -76,9 +78,9 @@ export async function saveAttendanceAction(input: {
   }));
 
   const { data, error } = await supabase.rpc("save_attendance", {
-    p_ekskul_id: input.ekskulId,
+    p_ekskul: input.ekskulId,
     p_tanggal: input.tanggal,
-    p_entries: entries,
+    p_items: entries,
   });
 
   if (error) {

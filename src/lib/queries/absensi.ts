@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDays, addMonths, isodow, todayISO } from "@/lib/utils/tanggal";
-import { getKelasMap, getSettings } from "@/lib/queries/master";
+import { getAppSettings, getKelasMap } from "@/lib/queries/master";
 import type { AttendanceStatus, Ekskul, EkskulJadwal } from "@/types/db";
 
 export interface EkskulWithJadwal extends Ekskul {
@@ -86,17 +86,20 @@ export async function getAttendancePageData(
   ekskulId: string,
   tanggalParam: string | undefined,
 ): Promise<AttendancePageData | null> {
-  const settings = await getSettings(supabase);
+  const [settings, kelasMap, ekskulRes] = await Promise.all([
+    getAppSettings(),
+    getKelasMap(supabase),
+    supabase
+      .from("ekskul")
+      .select("id,nama,deskripsi,is_active,created_at,ekskul_jadwal(hari)")
+      .eq("id", ekskulId)
+      .maybeSingle(),
+  ]);
   const timezone = settings?.timezone ?? "Asia/Jakarta";
   const today = todayISO(timezone);
   const windowMonths = settings?.edit_window_months ?? 6;
 
-  const { data: ekskulData } = await supabase
-    .from("ekskul")
-    .select("id,nama,deskripsi,is_active,created_at,ekskul_jadwal(hari)")
-    .eq("id", ekskulId)
-    .maybeSingle();
-
+  const ekskulData = ekskulRes.data;
   if (!ekskulData) return null;
   const ekskul = ekskulData as unknown as EkskulWithJadwal;
   const hari = (ekskul.ekskul_jadwal ?? []).map((j) => j.hari).sort();
@@ -143,19 +146,20 @@ export async function getAttendancePageData(
   }
   if (tanggal > today) tanggal = today;
 
-  const { data: memberRows } = await supabase
-    .from("members")
-    .select("id,student_id,joined_at,left_at,student:student_id(id,nama,nis,kelas_id)")
-    .eq("ekskul_id", ekskulId)
-    .lte("joined_at", tanggal)
-    .or(`left_at.is.null,left_at.gte.${tanggal}`)
-    .order("joined_at");
-
-  const { data: attRows } = await supabase
-    .from("attendance")
-    .select("member_id,status,catatan")
-    .eq("ekskul_id", ekskulId)
-    .eq("tanggal", tanggal);
+  const [{ data: memberRows }, { data: attRows }] = await Promise.all([
+    supabase
+      .from("members")
+      .select("id,student_id,joined_at,left_at,student:student_id(id,nama,nis,kelas_id)")
+      .eq("ekskul_id", ekskulId)
+      .lte("joined_at", tanggal)
+      .or(`left_at.is.null,left_at.gte.${tanggal}`)
+      .order("joined_at"),
+    supabase
+      .from("attendance")
+      .select("member_id,status,catatan")
+      .eq("ekskul_id", ekskulId)
+      .eq("tanggal", tanggal),
+  ]);
 
   const attMap = new Map(
     ((attRows ?? []) as Array<{
@@ -164,8 +168,6 @@ export async function getAttendancePageData(
       catatan: string | null;
     }>).map((r) => [r.member_id, r]),
   );
-
-  const kelasMap = await getKelasMap(supabase);
 
   const roster: RosterItem[] = (
     (memberRows ?? []) as unknown as Array<{

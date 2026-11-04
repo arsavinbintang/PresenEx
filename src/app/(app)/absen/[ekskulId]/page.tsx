@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { getAttendancePageData } from "@/lib/queries/absensi";
-import { getSettings } from "@/lib/queries/master";
+import { getAppSettings } from "@/lib/queries/master";
 import { AttendanceForm } from "@/components/absensi/attendance-form";
 import { LiburToggle } from "@/components/absensi/libur-toggle";
 import { Icon } from "@/components/ui/icons";
@@ -37,7 +37,7 @@ export default async function AbsenDetailPage({
 
   const [data, settings] = await Promise.all([
     getAttendancePageData(supabase, ekskulId, tanggalParam),
-    getSettings(supabase),
+    getAppSettings(),
   ]);
 
   if (!data) notFound();

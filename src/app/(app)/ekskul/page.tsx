@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { Empty } from "@/components/ui/empty";
 import { Flash } from "@/components/ui/flash";
-import { Icon } from "@/components/ui/icons";
+import { ActionModal } from "@/components/ui/action-modal";
 import { EkskulForm } from "@/components/admin/ekskul-form";
 import { labelHari } from "@/lib/utils/tanggal";
 import type { Profile } from "@/types/db";
@@ -69,10 +69,9 @@ export default async function EkskulPage({
         title="Ekskul"
         description={`${aktifCount} ekskul aktif · ${arsipCount} diarsipkan`}
         action={
-          <a href="#tambah" className="btn btn-primary btn-sm">
-            <Icon name="plus" className="h-4 w-4" />
-            Tambah
-          </a>
+          <ActionModal title="Tambah ekskul" hint="Isi nama, jadwal, dan PIC ekskul.">
+            <EkskulForm profiles={profiles} submitLabel="Simpan ekskul" />
+          </ActionModal>
         }
       />
 
@@ -108,7 +107,7 @@ export default async function EkskulPage({
           <Empty
             icon="school"
             title={showArsip ? "Tidak ada ekskul diarsipkan" : "Belum ada ekskul"}
-            description="Tambahkan ekskul lewat formulir di bawah halaman ini."
+            description="Tambahkan ekskul lewat tombol Tambah di atas."
           />
         </div>
       ) : (
@@ -163,10 +162,6 @@ export default async function EkskulPage({
         </div>
       )}
 
-      <section id="tambah" className="card mt-6 scroll-mt-20 p-4">
-        <h2 className="section-title mb-3">Tambah ekskul</h2>
-        <EkskulForm profiles={profiles} submitLabel="Simpan ekskul" />
-      </section>
     </div>
   );
 }
