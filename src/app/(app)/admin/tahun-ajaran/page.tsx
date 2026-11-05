@@ -42,12 +42,12 @@ const LANGKAH = [
   },
   {
     nomor: "4",
-    judul: "Rollover saat tahun berganti",
-    isi: "Tekan Rollover: kelas 10 naik ke 11, kelas 11 naik ke 12, kelas 12 lulus (NIS dikosongkan). Tahun ajaran baru otomatis aktif.",
+    judul: "Naik kelas saat tahun berganti",
+    isi: "Tekan Jalankan naik kelas: kelas 10 naik ke 11, kelas 11 naik ke 12, kelas 12 lulus (NIS dikosongkan). Tahun ajaran baru otomatis aktif.",
   },
   {
     nomor: "5",
-    judul: "Arsipkan / hapus",
+    judul: "Nonaktifkan / hapus",
     isi: "Tahun ajaran lama otomatis tidak aktif setelah rollover. Tahun ajaran lama yang sudah tidak berisi siswa aktif bisa dihapus.",
   },
 ];
@@ -207,19 +207,22 @@ export default async function TahunAjaranPage({
             <span className="badge badge-alpha">Belum ada yang aktif</span>
           )}
           {inactiveCount > 0 ? (
-            <span className="badge badge-muted">{inactiveCount} arsip</span>
+            <span className="badge badge-muted">{inactiveCount} nonaktif</span>
           ) : null}
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4">
-          <h2 className="section-title mb-2">Rollover ke tahun ajaran baru</h2>
+          <h2 className="section-title mb-2">
+            Naik kelas ke tahun ajaran baru
+          </h2>
           <p className="muted mb-3 text-xs">
-            Siswa kelas 10/11 naik kelas tanpa pindah jurusan. Siswa kelas 12
-            jadi lulus, NIS di-null-kan, data pribadi + absensi akan dihapus
-            berbulan-bulan setelah lulus (atur di Retensi). Rekap absensi harian
-            tetap disimpan.
+            Siswa kelas 10 naik ke 11, kelas 11 naik ke 12 (jurusan tetap sama),
+            dan siswa kelas 12 ditandai lulus dengan NIS dikosongkan. Data
+            pribadi siswa lulus beserta absensinya dihapus otomatis beberapa
+            bulan setelah lulus (atur di menu Hapus data lulus). Rekap absensi
+            harian tetap disimpan.
           </p>
 
           {active ? (
@@ -275,9 +278,9 @@ export default async function TahunAjaranPage({
               </label>
               <ConfirmSubmit
                 className="btn btn-primary"
-                message="Jalankan rollover? Siswa kelas 12 akan ditandai lulus dan tahun ajaran baru menjadi aktif. Tindakan ini tidak bisa dibatalkan."
+                message="Lanjutkan naik kelas? Siswa kelas 12 akan ditandai lulus dan tahun ajaran baru menjadi aktif. Tindakan ini tidak bisa dibatalkan."
               >
-                Jalankan rollover
+                Jalankan naik kelas
               </ConfirmSubmit>
             </form>
           ) : (
@@ -300,7 +303,7 @@ export default async function TahunAjaranPage({
           </div>
 
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Nama</th>
@@ -326,15 +329,20 @@ export default async function TahunAjaranPage({
                           {formatTanggalPendek(row.selesai)}
                         </p>
                       </td>
-                      <td className="muted hidden text-sm sm:table-cell">
+                      <td
+                        className="muted hidden text-sm sm:table-cell"
+                        data-label="Periode"
+                      >
                         {formatTanggalPendek(row.mulai)} –{" "}
                         {formatTanggalPendek(row.selesai)}
                       </td>
-                      <td>
+                      <td data-label="Status">
                         {row.is_active ? (
                           <span className="badge badge-hadir">Aktif</span>
                         ) : (
-                          <span className="badge badge-muted">Arsip</span>
+                          <span className="badge badge-muted">
+                            Nonaktif
+                          </span>
                         )}
                       </td>
                       <td>

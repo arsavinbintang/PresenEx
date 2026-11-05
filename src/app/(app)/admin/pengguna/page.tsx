@@ -9,6 +9,7 @@ import {
   createPenggunaAction,
   resetPasswordAction,
   togglePenggunaAction,
+  updatePenggunaAction,
 } from "@/lib/actions/admin";
 import { formatTanggalPendek } from "@/lib/utils/tanggal";
 import type { Profile } from "@/types/db";
@@ -187,6 +188,39 @@ export default async function PenggunaPage({
                       ? " · Belum memegang ekskul"
                       : ""}
                 </p>
+
+                <form
+                  action={updatePenggunaAction}
+                  className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2"
+                >
+                  <input type="hidden" name="id" value={profile.id} />
+                  <div>
+                    <label className="label">Nama lengkap</label>
+                    <input
+                      name="nama"
+                      className="input"
+                      defaultValue={profile.nama}
+                      required
+                      maxLength={80}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Peran</label>
+                    <select
+                      name="role"
+                      className="select"
+                      defaultValue={profile.role}
+                    >
+                      <option value="pic">PIC — mengelola ekskul yang ditugaskan</option>
+                      <option value="admin">Admin — akses penuh</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <SubmitButton className="btn btn-ghost btn-sm">
+                      Simpan nama &amp; peran
+                    </SubmitButton>
+                  </div>
+                </form>
 
                 <div className="flex flex-wrap items-end gap-3">
                   <form action={resetPasswordAction} className="flex flex-wrap items-end gap-2">

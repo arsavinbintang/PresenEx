@@ -299,3 +299,101 @@ body {
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
+
+/* =========================================================
+   Polesan HP (≤640px)
+   - area sentuh minimal 44px
+   - input 16px agar iOS tidak men-zoom otomatis
+   - tombol utama lebar penuh supaya mudah ditekan
+   - tabel berubah jadi kartu (label tetap terbaca)
+   ========================================================= */
+@media (max-width: 640px) {
+  .btn {
+    min-height: 2.75rem;
+  }
+
+  .btn-sm {
+    min-height: 2.5rem;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    font-size: 16px;
+    min-height: 2.75rem;
+  }
+
+  form .btn-primary {
+    width: 100%;
+  }
+
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.65rem 0.6rem;
+  }
+
+  /* Tabel kartu: baris jadi kartu, kolom isi jadi baris berlabel. */
+  .table-cards thead {
+    display: none;
+  }
+
+  .table-cards,
+  .table-cards tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .table-cards tr {
+    display: block;
+    margin-bottom: 0.5rem;
+    padding: 0.3rem 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .table-cards td {
+    display: block;
+    border-bottom: none;
+    padding: 0.3rem 0.7rem;
+  }
+
+  /* Kolom yang memang disembunyikan di HP tetap tersembunyi. */
+  .table-cards td.hidden {
+    display: none;
+  }
+
+  .table-cards td[data-label] {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .table-cards td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .table-cards td:first-child {
+    font-weight: 600;
+  }
+
+  .table-cards td.text-right {
+    text-align: right;
+  }
+
+  .table-cards tr:last-child {
+    margin-bottom: 0;
+  }
+}

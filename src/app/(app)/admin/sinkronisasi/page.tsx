@@ -7,7 +7,9 @@ import { Flash } from "@/components/ui/flash";
 import { Empty } from "@/components/ui/empty";
 import { Icon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 import {
+  deleteSheetConfigAction,
   retrySyncAction,
   saveSheetConfigAction,
 } from "@/lib/actions/admin";
@@ -197,6 +199,16 @@ export default async function SinkronisasiPage({
                   ) : (
                     <span className="badge badge-muted">Cadangan</span>
                   )}
+                  <form action={deleteSheetConfigAction}>
+                    <input type="hidden" name="id" value={config.id} />
+                    <ConfirmSubmit
+                      className="btn btn-ghost btn-sm !px-2"
+                      title="Hapus konfigurasi"
+                      message={`Hapus Spreadsheet untuk ${config.tahun_ajaran?.nama ?? "tahun ajaran ini"}? Absensi berikutnya tidak akan tersinkron sampai konfigurasi baru dibuat.`}
+                    >
+                      <Icon name="trash" className="h-4 w-4" />
+                    </ConfirmSubmit>
+                  </form>
                 </li>
               ))}
             </ul>
@@ -308,7 +320,7 @@ export default async function SinkronisasiPage({
           />
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Ekskul</th>
@@ -327,7 +339,7 @@ export default async function SinkronisasiPage({
                         <span className="badge badge-sakit ml-1">hapus</span>
                       ) : null}
                     </td>
-                    <td className="muted text-sm">
+                    <td className="muted text-sm" data-label="Tanggal">
                       <span className="sm:hidden">
                         {formatTanggalPendek(job.tanggal)}
                       </span>
@@ -335,15 +347,21 @@ export default async function SinkronisasiPage({
                         {formatTanggalLengkapPendek(job.tanggal)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <span className={STATUS_CLASS[job.status]}>
                         {STATUS_LABEL[job.status]}
                       </span>
                     </td>
-                    <td className="hidden tabular-nums sm:table-cell">
+                    <td
+                      className="hidden tabular-nums sm:table-cell"
+                      data-label="Percobaan"
+                    >
                       {job.attempts}
                     </td>
-                    <td className="muted hidden max-w-xs truncate text-xs sm:table-cell">
+                    <td
+                      className="muted hidden max-w-xs truncate text-xs sm:table-cell"
+                      data-label="Catatan"
+                    >
                       {job.last_error ?? "-"}
                     </td>
                   </tr>

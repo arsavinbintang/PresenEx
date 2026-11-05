@@ -98,7 +98,7 @@ export default async function EkskulPage({
               : { color: "var(--muted)" }
           }
         >
-          Diarsipkan
+          Nonaktif
         </Link>
       </div>
 
@@ -106,7 +106,7 @@ export default async function EkskulPage({
         <div className="card">
           <Empty
             icon="school"
-            title={showArsip ? "Tidak ada ekskul diarsipkan" : "Belum ada ekskul"}
+            title={showArsip ? "Tidak ada ekskul nonaktif" : "Belum ada ekskul"}
             description="Tambahkan ekskul lewat tombol Tambah di atas."
           />
         </div>
@@ -142,7 +142,7 @@ export default async function EkskulPage({
                         : "badge badge-muted"
                     }
                   >
-                    {item.is_active ? "Aktif" : "Arsip"}
+                    {item.is_active ? "Aktif" : "Nonaktif"}
                   </span>
                 </div>
 

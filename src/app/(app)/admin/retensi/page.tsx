@@ -64,11 +64,11 @@ export default async function RetensiPage({
   return (
     <div>
       <PageHeader
-        title="Retensi"
-        description={`Hapus data siswa lulus ${settings?.purge_after_months ?? 3} bulan setelah lulus`}
+        title="Hapus Data Siswa Lulus"
+        description={`Menghapus data pribadi dan absensi siswa lulus ${settings?.purge_after_months ?? 3} bulan setelah lulus. Penghapusan bisa ditunda per siswa.`}
         action={
           <Link href="/admin/pengaturan" className="btn btn-ghost btn-sm">
-            Ubah masa retensi
+            Ubah jadwal penghapusan
           </Link>
         }
       />
@@ -109,13 +109,13 @@ export default async function RetensiPage({
           <Empty
             icon="archive"
             title="Belum ada siswa lulus"
-            description="Siswa akan masuk ke sini setelah rollover tahun ajaran."
+            description="Siswa akan masuk ke sini setelah naik kelas ke tahun ajaran baru."
           />
         </div>
       ) : (
         <div className="card overflow-hidden">
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Nama</th>
@@ -136,12 +136,12 @@ export default async function RetensiPage({
                           NIS {student.nis ?? "sudah dikosongkan"}
                         </p>
                       </td>
-                      <td className="muted text-sm">
+                      <td className="muted text-sm" data-label="Lulus">
                         {student.lulus_at
                           ? formatTanggalPendek(student.lulus_at)
                           : "-"}
                       </td>
-                      <td>
+                      <td data-label="Status hapus">
                         {student.purge_hold ? (
                           <span className="badge badge-sakit">Ditahan</span>
                         ) : due ? (

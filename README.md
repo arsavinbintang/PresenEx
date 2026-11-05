@@ -45,6 +45,7 @@ dicadangkan ke Google Sheets; kalau Sheets gagal, absensi tetap tersimpan.
 supabase/migrations/0001_init.sql   skema, RLS, trigger, fungsi baca
 supabase/migrations/0002_rpc.sql    RPC tulis + rollover + retensi + grant
 supabase/migrations/0003_branding.sql  tema, logo, sponsor, bucket storage
+supabase/migrations/0004_kelas_per_tingkat.sql  jumlah kelas per tingkat (X/XI/XII)
 src/lib/actions/                    server action (admin & absensi)
 src/lib/queries/                    query baca per halaman
 src/lib/sheets/sync.ts              sinkronisasi Google Sheets
@@ -61,6 +62,10 @@ scripts/seed-admin.mjs              pembuat admin pertama
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_rpc.sql`
    - `supabase/migrations/0003_branding.sql` (tema, logo, sponsor, storage)
+   - `supabase/migrations/0004_kelas_per_tingkat.sql` (jumlah kelas X/XI/XII boleh beda)
+
+   > Database sudah pernah dibuat? Cukup jalankan file migrasi **terbaru yang
+   > belum dijalankan** (urutan file tidak boleh diacak).
 3. Ambil kredensial di **Project Settings → API**:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` public key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`

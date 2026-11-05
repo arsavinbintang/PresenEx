@@ -55,7 +55,9 @@ export interface Jurusan {
   id: string;
   kode: string;
   nama: string;
-  kelas_per_tingkat: number;
+  jumlah_kelas_10: number;
+  jumlah_kelas_11: number;
+  jumlah_kelas_12: number;
   is_active: boolean;
   created_at: string;
 }

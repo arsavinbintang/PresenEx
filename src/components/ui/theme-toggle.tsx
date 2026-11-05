@@ -7,8 +7,9 @@ import type { Tema } from "@/types/db";
 const KEY = "presenex.tema";
 const EVENT = "presenex:tema-change";
 
-const LABEL: Record<Tema, string> = {
-  auto: "Ikut sistem",
+type Mode = "light" | "dark";
+
+const LABEL: Record<Mode, string> = {
   light: "Mode terang",
   dark: "Mode gelap",
 };
@@ -27,12 +28,18 @@ function bacaTersimpan(): Tema | null {
   return null;
 }
 
-function snapshot(): Tema {
-  return bacaTersimpan() ?? "auto";
+/** Mode yang sedang tampil di layar (hasil terang/gelap final, bukan "auto"). */
+function snapshot(): Mode {
+  const attr = document.documentElement.getAttribute("data-theme");
+  if (attr === "dark") return "dark";
+  if (attr === "light") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
 }
 
-function serverSnapshot(): Tema {
-  return "auto";
+function serverSnapshot(): Mode {
+  return "light";
 }
 
 function subscribe(onChange: () => void): () => void {
@@ -69,11 +76,12 @@ function terapkan(pilihan: Tema) {
 }
 
 /**
- * Tombol ganti tema: Ikut sistem → Terang → Gelap → ulang.
- * Pilihan pengguna disimpan di perangkat ini.
+ * Tombol ganti tema: langsung terang ↔ gelap (hanya ikon matahari / bulan).
+ * Pilihan pengguna disimpan di perangkat ini; bila sebelumnya "ikut sistem",
+ * tekanan pertama mengunci salah satu mode.
  */
 export function ThemeToggle({ className }: { className?: string }) {
-  const tema = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const mode = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 
   // Saat mode "auto", ikuti perubahan sistem operasi secara langsung.
   useEffect(() => {
@@ -91,13 +99,10 @@ export function ThemeToggle({ className }: { className?: string }) {
   }, []);
 
   function ganti() {
-    const next: Tema =
-      tema === "auto" ? "light" : tema === "light" ? "dark" : "auto";
-    terapkan(next);
+    terapkan(mode === "dark" ? "light" : "dark");
   }
 
-  const icon =
-    tema === "light" ? "sun" : tema === "dark" ? "moon" : "monitor";
+  const lawan: Mode = mode === "dark" ? "light" : "dark";
 
   return (
     <button
@@ -106,10 +111,10 @@ export function ThemeToggle({ className }: { className?: string }) {
       className={
         className ?? "btn btn-ghost btn-sm !min-h-8 !w-8 !rounded-full !px-0"
       }
-      title={`Tema: ${LABEL[tema]}`}
-      aria-label={`Tema saat ini: ${LABEL[tema]}. Klik untuk mengganti.`}
+      title={`${LABEL[mode]} — klik untuk ${LABEL[lawan].toLowerCase()}`}
+      aria-label={`Tema saat ini: ${LABEL[mode]}. Klik untuk mengganti ke ${LABEL[lawan].toLowerCase()}.`}
     >
-      <Icon name={icon} className="h-4 w-4" />
+      <Icon name={mode === "light" ? "sun" : "moon"} className="h-4 w-4" />
     </button>
   );
 }

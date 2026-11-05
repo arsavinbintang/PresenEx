@@ -83,8 +83,12 @@ export function ActionModal({
 
           <div
             ref={panelRef}
-            className="relative z-10 max-h-[88vh] w-full overflow-y-auto rounded-t-2xl border bg-[var(--surface)] p-4 shadow-2xl sm:max-w-lg sm:rounded-2xl"
+            className="relative z-10 max-h-[88vh] w-full overflow-y-auto rounded-t-2xl border bg-[var(--surface)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:max-w-lg sm:rounded-2xl sm:pb-4"
           >
+            <div
+              aria-hidden="true"
+              className="mx-auto mb-2 h-1 w-10 rounded-full bg-[var(--border)] sm:hidden"
+            />
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-base font-bold tracking-tight">{title}</h2>
@@ -94,7 +98,7 @@ export function ActionModal({
               </div>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm !min-h-8 !w-8 !rounded-full !px-0"
+                className="btn btn-ghost btn-sm !w-10 !rounded-full !px-0 sm:!w-8"
                 onClick={() => setOpen(false)}
                 aria-label="Tutup formulir"
               >

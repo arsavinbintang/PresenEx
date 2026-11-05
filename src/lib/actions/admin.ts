@@ -89,15 +89,71 @@ export async function toggleEkskulActiveAction(
   back("/ekskul", active ? "Ekskul diaktifkan kembali." : "Ekskul diarsipkan.");
 }
 
-export async function addMemberAction(formData: FormData): Promise<void> {
+/**
+ * Izin mengelola anggota: admin bebas, PIC hanya untuk ekskul yang ditugaskan
+ * kepadanya. Mengembalikan session + client supabase yang sudah dipakai.
+ */
+async function ensureEkskulAccess(ekskulId: string) {
+  const session = await requireSession();
+  const supabase = await createClient();
+
+  if (session.profile.role === "admin") return { session, supabase };
+  if (!ekskulId) redirect("/ekskul");
+
+  const { data: link } = await supabase
+    .from("ekskul_pic")
+    .select("ekskul_id")
+    .eq("ekskul_id", ekskulId)
+    .eq("profile_id", session.profile.id)
+    .maybeSingle();
+
+  if (!link) redirect("/ekskul");
+  return { session, supabase };
+}
+
+export async function deleteEkskulAction(formData: FormData): Promise<void> {
   await ensureAdmin();
   const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+
+  const { data: ekskul } = await supabase
+    .from("ekskul")
+    .select("id,nama")
+    .eq("id", id)
+    .maybeSingle();
+  if (!ekskul) back("/ekskul", "Ekskul tidak ditemukan.", "error");
+
+  const { count } = await supabase
+    .from("attendance")
+    .select("id", { count: "exact", head: true })
+    .eq("ekskul_id", id);
+
+  if ((count ?? 0) > 0) {
+    back(
+      "/ekskul",
+      `${ekskul.nama} punya ${count} absensi tersimpan. Gunakan "Nonaktifkan" agar riwayatnya tetap aman.`,
+      "error",
+    );
+  }
+
+  const { error } = await supabase.from("ekskul").delete().eq("id", id);
+  if (error) back("/ekskul", error.message, "error");
+
+  revalidatePath("/ekskul");
+  revalidatePath("/dashboard");
+  back("/ekskul", `Ekskul ${ekskul.nama} dihapus.`);
+}
+
+export async function addMemberAction(formData: FormData): Promise<void> {
   const ekskulId = String(formData.get("ekskul_id") ?? "");
+  const { supabase } = await ensureEkskulAccess(ekskulId);
   const studentId = String(formData.get("student_id") ?? "");
   const joinedAt =
     String(formData.get("joined_at") ?? "").trim() || todayISO();
 
-  if (!studentId) back(`/ekskul/${ekskulId}`, "Pilih siswa dulu.", "error");
+  if (!ekskulId || !studentId) {
+    back(`/ekskul/${ekskulId}`, "Pilih siswa dulu.", "error");
+  }
 
   const { error } = await supabase.from("members").insert({
     ekskul_id: ekskulId,
@@ -117,9 +173,8 @@ export async function addMemberAction(formData: FormData): Promise<void> {
 }
 
 export async function removeMemberAction(formData: FormData): Promise<void> {
-  await ensureAdmin();
-  const supabase = await createClient();
   const ekskulId = String(formData.get("ekskul_id") ?? "");
+  const { supabase } = await ensureEkskulAccess(ekskulId);
   const memberId = String(formData.get("member_id") ?? "");
 
   const { error } = await supabase
@@ -136,6 +191,16 @@ export async function removeMemberAction(formData: FormData): Promise<void> {
 // =========================================================
 // JURUSAN & KELAS
 // =========================================================
+/** Baca jumlah kelas satu tingkat dari form (0–20; 0 = tingkat itu tanpa kelas). */
+function jumlahKelas(formData: FormData, name: string): number {
+  const raw = String(formData.get(name) ?? "").trim();
+  const value = raw === "" ? 0 : Number(raw);
+  if (!Number.isInteger(value) || value < 0 || value > 20) {
+    back("/admin/jurusan", "Jumlah kelas tiap tingkat harus 0–20.", "error");
+  }
+  return value;
+}
+
 export async function saveJurusanAction(formData: FormData): Promise<void> {
   await ensureAdmin();
   const supabase = await createClient();
@@ -143,20 +208,21 @@ export async function saveJurusanAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "").trim() || null;
   const kode = String(formData.get("kode") ?? "").trim().toUpperCase();
   const nama = String(formData.get("nama") ?? "").trim();
-  const jumlah = Number(formData.get("kelas_per_tingkat") ?? 3);
+  const jumlah10 = jumlahKelas(formData, "jumlah_kelas_10");
+  const jumlah11 = jumlahKelas(formData, "jumlah_kelas_11");
+  const jumlah12 = jumlahKelas(formData, "jumlah_kelas_12");
   const active = String(formData.get("is_active") ?? "") === "1";
 
   if (!kode || !nama) {
     back("/admin/jurusan", "Kode dan nama jurusan wajib diisi.", "error");
   }
-  if (!Number.isInteger(jumlah) || jumlah < 1 || jumlah > 20) {
-    back("/admin/jurusan", "Jumlah kelas harus 1–20.", "error");
-  }
 
   const payload = {
     kode,
     nama,
-    kelas_per_tingkat: jumlah,
+    jumlah_kelas_10: jumlah10,
+    jumlah_kelas_11: jumlah11,
+    jumlah_kelas_12: jumlah12,
     is_active: active,
   };
 
@@ -167,12 +233,20 @@ export async function saveJurusanAction(formData: FormData): Promise<void> {
   if (error) {
     const message = error.code === "23505"
       ? `Kode jurusan ${kode} sudah dipakai.`
-      : error.message;
+      : error.message.includes("check")
+        ? "Jumlah kelas tiap tingkat harus 0–20."
+        : error.message;
     back("/admin/jurusan", message, "error");
   }
 
   revalidatePath("/admin/jurusan");
-  back("/admin/jurusan", id ? "Jurusan diperbarui." : "Jurusan ditambahkan.");
+  revalidatePath("/admin/kelas");
+  back(
+    "/admin/jurusan",
+    id
+      ? `Jurusan diperbarui (X ${jumlah10} · XI ${jumlah11} · XII ${jumlah12} kelas).`
+      : "Jurusan ditambahkan.",
+  );
 }
 
 export async function deleteJurusanAction(formData: FormData): Promise<void> {
@@ -226,7 +300,12 @@ export async function generateKelasAction(formData: FormData): Promise<void> {
 
   if (error) back("/admin/kelas", error.message, "error");
   revalidatePath("/admin/kelas");
-  back("/admin/kelas", `${data ?? 0} kelas baru dibuat.`);
+  back(
+    "/admin/kelas",
+    (data ?? 0) > 0
+      ? `${data} kelas baru dibuat sesuai jumlah kelas tiap jurusan.`
+      : "Tidak ada kelas baru — semua kombinasi jurusan × tingkat × nomor sudah ada.",
+  );
 }
 
 export async function addKelasAction(formData: FormData): Promise<void> {
@@ -721,7 +800,7 @@ export async function rolloverAction(formData: FormData): Promise<void> {
   revalidatePath("/admin/retensi");
   back(
     "/admin/tahun-ajaran",
-    `Rollover selesai: ${result.siswa_naik_kelas} naik kelas, ${result.siswa_lulus} lulus, ${result.anggota_disalin} anggota disalin.`,
+    `Naik kelas selesai: ${result.siswa_naik_kelas} siswa naik kelas, ${result.siswa_lulus} siswa lulus, ${result.anggota_disalin} anggota ekskul disalin.`,
   );
 }
 
@@ -828,6 +907,46 @@ export async function togglePenggunaAction(formData: FormData): Promise<void> {
   if (error) back("/admin/pengguna", error.message, "error");
   revalidatePath("/admin/pengguna");
   back("/admin/pengguna", active ? "Akun diaktifkan." : "Akun dinonaktifkan.");
+}
+
+export async function updatePenggunaAction(formData: FormData): Promise<void> {
+  const session = await ensureAdmin();
+  const supabase = await createClient();
+
+  const id = String(formData.get("id") ?? "");
+  const nama = String(formData.get("nama") ?? "").trim();
+  const role = String(formData.get("role") ?? "");
+
+  if (!id || !nama) back("/admin/pengguna", "Nama wajib diisi.", "error");
+  if (role !== "admin" && role !== "pic") {
+    back("/admin/pengguna", "Peran harus admin atau pic.", "error");
+  }
+
+  if (id === session.profile.id && role !== "admin") {
+    const { count } = await supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "admin")
+      .eq("is_active", true);
+    if ((count ?? 0) <= 1) {
+      back(
+        "/admin/pengguna",
+        "Anda admin terakhir. Buat admin lain dulu sebelum menurunkan peran sendiri.",
+        "error",
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ nama, role })
+    .eq("id", id);
+
+  if (error) back("/admin/pengguna", error.message, "error");
+
+  revalidatePath("/admin/pengguna");
+  revalidatePath("/ekskul");
+  back("/admin/pengguna", "Data pengguna diperbarui.");
 }
 
 // =========================================================

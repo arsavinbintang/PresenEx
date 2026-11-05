@@ -242,7 +242,7 @@ export default async function SiswaPage({
       ) : (
         <div className="card overflow-hidden">
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-cards">
               <thead>
                 <tr>
                   <th>Nama</th>
@@ -267,10 +267,13 @@ export default async function SiswaPage({
                           : "-"}
                       </p>
                     </td>
-                    <td className="muted text-xs tabular-nums">
+                    <td
+                      className="muted text-xs tabular-nums"
+                      data-label="NIS"
+                    >
                       {student.nis ?? "-"}
                     </td>
-                    <td className="hidden sm:table-cell">
+                    <td className="hidden sm:table-cell" data-label="Kelas">
                       {student.kelas_id
                         ? (kelasMap.get(student.kelas_id)?.label ?? "-")
                         : "-"}

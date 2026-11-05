@@ -11,6 +11,7 @@ import { EkskulForm } from "@/components/admin/ekskul-form";
 import { StudentPicker } from "@/components/admin/student-picker";
 import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 import {
+  deleteEkskulAction,
   removeMemberAction,
   toggleEkskulActiveAction,
 } from "@/lib/actions/admin";
@@ -72,46 +73,30 @@ export default async function EkskulDetailPage({
       (p): p is { id: string; nama: string; username: string } => Boolean(p),
     );
 
-  const [membersRes, dailyRes, settingsRes, profilesRes, studentsRes] =
-    await Promise.all([
-      supabase
-        .from("members")
-        .select(
-          "id,joined_at,student:student_id(id,nama,nis,kelas_id)",
-        )
-        .eq("ekskul_id", id)
-        .is("left_at", null),
-      supabase
-        .from("attendance_daily")
-        .select("tanggal,total,hadir,izin,sakit,alpha")
-        .eq("ekskul_id", id)
-        .order("tanggal", { ascending: false })
-        .limit(12),
-      supabase.from("app_settings").select("timezone").eq("id", true).maybeSingle(),
-      isAdmin
-        ? supabase
-            .from("profiles")
-            .select("id,nama,username,role")
-            .eq("role", "pic")
-            .eq("is_active", true)
-            .order("nama")
-        : Promise.resolve({ data: [] as Array<Profile> }),
-      isAdmin
-        ? supabase
-            .from("students")
-            .select("id,nama,nis,kelas_id")
-            .eq("status", "aktif")
-            .order("nama")
-            .limit(3000)
-        : Promise.resolve({
-            data: [] as Array<{
-              id: string;
-              nama: string;
-              nis: string | null;
-              kelas_id: string | null;
-            }>,
-          }),
-    ]);
+  const [membersRes, dailyRes, settingsRes, profilesRes] = await Promise.all([
+    supabase
+      .from("members")
+      .select(
+        "id,joined_at,student:student_id(id,nama,nis,kelas_id)",
+      )
+      .eq("ekskul_id", id)
+      .is("left_at", null),
+    supabase
+      .from("attendance_daily")
+      .select("tanggal,total,hadir,izin,sakit,alpha")
+      .eq("ekskul_id", id)
+      .order("tanggal", { ascending: false })
+      .limit(12),
+    supabase.from("app_settings").select("timezone").eq("id", true).maybeSingle(),
+    isAdmin
+      ? supabase
+          .from("profiles")
+          .select("id,nama,username,role")
+          .eq("role", "pic")
+          .eq("is_active", true)
+          .order("nama")
+      : Promise.resolve({ data: [] as Array<Profile> }),
+  ]);
 
   const today = todayISO(
     (settingsRes.data as { timezone?: string } | null)?.timezone ??
@@ -143,25 +128,6 @@ export default async function EkskulDetailPage({
       studentId: row.student!.id,
     }))
     .sort((a, b) => a.nama.localeCompare(b.nama));
-
-  const memberStudentIds = new Set(members.map((m) => m.studentId));
-  const pickable = (
-    (studentsRes.data ?? []) as Array<{
-      id: string;
-      nama: string;
-      nis: string | null;
-      kelas_id: string | null;
-    }>
-  )
-    .filter((student) => !memberStudentIds.has(student.id))
-    .map((student) => ({
-      id: student.id,
-      nama: student.nama,
-      nis: student.nis,
-      kelas: student.kelas_id
-        ? (kelasMap.get(student.kelas_id)?.label ?? "-")
-        : "-",
-    }));
 
   const daily = (dailyRes.data ?? []) as Array<{
     tanggal: string;
@@ -200,27 +166,39 @@ export default async function EkskulDetailPage({
               Absensi
             </Link>
             {isAdmin ? (
-              <form action={toggleEkskulActiveAction}>
-                <input type="hidden" name="id" value={ekskul.id} />
-                <input
-                  type="hidden"
-                  name="active"
-                  value={ekskul.is_active ? "0" : "1"}
-                />
-                {ekskul.is_active ? (
+              <>
+                <form action={toggleEkskulActiveAction}>
+                  <input type="hidden" name="id" value={ekskul.id} />
+                  <input
+                    type="hidden"
+                    name="active"
+                    value={ekskul.is_active ? "0" : "1"}
+                  />
+                  {ekskul.is_active ? (
+                    <ConfirmSubmit
+                      className="btn btn-ghost btn-sm"
+                      message={`Nonaktifkan ${ekskul.nama}? Ekskul tidak muncul di daftar absensi, tetapi semua riwayat tetap tersimpan dan bisa diaktifkan lagi.`}
+                    >
+                      <Icon name="archive" className="h-4 w-4" />
+                      Nonaktifkan
+                    </ConfirmSubmit>
+                  ) : (
+                    <button type="submit" className="btn btn-ghost btn-sm">
+                      Aktifkan
+                    </button>
+                  )}
+                </form>
+                <form action={deleteEkskulAction}>
+                  <input type="hidden" name="id" value={ekskul.id} />
                   <ConfirmSubmit
                     className="btn btn-ghost btn-sm"
-                    message={`Arsipkan ${ekskul.nama}? Ekskul tidak muncul di daftar absensi, tetapi semua riwayat tetap tersimpan.`}
+                    title="Hapus ekskul"
+                    message={`Hapus ekskul ${ekskul.nama}? Hanya bisa dilakukan bila belum ada absensi. Bila sudah ada absensi, gunakan Nonaktifkan agar riwayat tetap aman.`}
                   >
-                    <Icon name="archive" className="h-4 w-4" />
-                    Arsipkan
+                    <Icon name="trash" className="h-4 w-4" />
                   </ConfirmSubmit>
-                ) : (
-                  <button type="submit" className="btn btn-ghost btn-sm">
-                    Aktifkan
-                  </button>
-                )}
-              </form>
+                </form>
+              </>
             ) : null}
           </div>
         }
@@ -240,21 +218,17 @@ export default async function EkskulDetailPage({
               <Empty
                 icon="users"
                 title="Belum ada anggota"
-                description={
-                  isAdmin
-                    ? "Tambahkan siswa lewat formulir di bawah."
-                    : "Admin belum menambahkan anggota untuk ekskul ini."
-                }
+                description="Tambahkan siswa lewat formulir di bawah: ketik nama, NIS, atau kelas, lalu pilih siswanya."
               />
             ) : (
               <div className="table-wrap -mx-1">
-                <table className="table">
+                <table className="table table-cards">
                   <thead>
                     <tr>
                       <th>Nama</th>
                       <th className="hidden sm:table-cell">Kelas</th>
                       <th className="hidden sm:table-cell">Bergabung</th>
-                      {isAdmin ? <th /> : null}
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -277,33 +251,36 @@ export default async function EkskulDetailPage({
                             </p>
                           ) : null}
                         </td>
-                        <td className="hidden sm:table-cell">{member.kelas}</td>
-                        <td className="muted hidden text-xs sm:table-cell">
+                        <td className="hidden sm:table-cell" data-label="Kelas">
+                          {member.kelas}
+                        </td>
+                        <td
+                          className="muted hidden text-xs sm:table-cell"
+                          data-label="Bergabung"
+                        >
                           {formatTanggalLengkapPendek(member.joinedAt)}
                         </td>
-                        {isAdmin ? (
-                          <td className="text-right">
-                            <form action={removeMemberAction}>
-                              <input
-                                type="hidden"
-                                name="ekskul_id"
-                                value={ekskul.id}
-                              />
-                              <input
-                                type="hidden"
-                                name="member_id"
-                                value={member.memberId}
-                              />
-                              <ConfirmSubmit
-                                className="btn btn-ghost btn-sm !px-2"
-                                message={`Keluarkan ${member.nama} dari ${ekskul.nama}? Riwayat absensi tetap tersimpan.`}
-                                title="Keluarkan"
-                              >
-                                <Icon name="close" className="h-4 w-4" />
-                              </ConfirmSubmit>
-                            </form>
-                          </td>
-                        ) : null}
+                        <td className="text-right">
+                          <form action={removeMemberAction}>
+                            <input
+                              type="hidden"
+                              name="ekskul_id"
+                              value={ekskul.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="member_id"
+                              value={member.memberId}
+                            />
+                            <ConfirmSubmit
+                              className="btn btn-ghost btn-sm !px-2"
+                              message={`Keluarkan ${member.nama} dari ${ekskul.nama}? Riwayat absensi tetap tersimpan.`}
+                              title="Keluarkan"
+                            >
+                              <Icon name="close" className="h-4 w-4" />
+                            </ConfirmSubmit>
+                          </form>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -312,16 +289,14 @@ export default async function EkskulDetailPage({
             )}
           </section>
 
-          {isAdmin ? (
-            <section className="card p-4">
-              <h2 className="section-title mb-3">Tambah anggota</h2>
-              <StudentPicker
-                ekskulId={ekskul.id}
-                students={pickable}
-                today={today}
-              />
-            </section>
-          ) : null}
+          <section className="card p-4">
+            <h2 className="section-title mb-1">Tambah anggota</h2>
+            <p className="muted mb-3 text-xs">
+              Daftar siswa tidak dimuat sekaligus (jumlahnya ribuan). Cukup
+              ketik nama siswa, lalu pilih dari hasil pencarian.
+            </p>
+            <StudentPicker ekskulId={ekskul.id} today={today} />
+          </section>
 
           <section className="card p-4">
             <div className="mb-3 flex items-center justify-between gap-2">

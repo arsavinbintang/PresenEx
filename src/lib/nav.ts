@@ -30,7 +30,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/pengguna", label: "Pengguna", icon: "user" },
       { href: "/admin/sinkronisasi", label: "Sinkronisasi", icon: "sync" },
-      { href: "/admin/retensi", label: "Retensi", icon: "trash" },
+      { href: "/admin/retensi", label: "Hapus data lulus", icon: "trash" },
       { href: "/admin/pengaturan", label: "Pengaturan", icon: "settings" },
     ],
   },

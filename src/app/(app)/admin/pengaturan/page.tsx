@@ -271,7 +271,7 @@ export default async function PengaturanPage({
         </section>
 
         <section className="card p-4">
-          <h2 className="section-title mb-3">Retensi siswa lulus</h2>
+          <h2 className="section-title mb-3">Penghapusan siswa lulus</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="label" htmlFor="purge_after_months">

@@ -147,7 +147,7 @@ export async function toggleLiburAction(input: {
     const { error } = await supabase.from("sesi_libur").upsert({
       ekskul_id: input.ekskulId,
       tanggal: input.tanggal,
-      alasan: "Ditandai dari halaman absensi",
+      keterangan: "Ditandai dari halaman absensi",
     });
     if (error) return { ok: false, message: error.message };
   } else {

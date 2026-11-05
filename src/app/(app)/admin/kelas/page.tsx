@@ -3,11 +3,13 @@ import { requireAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { Flash } from "@/components/ui/flash";
+import { Icon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { Empty } from "@/components/ui/empty";
 import { ConfirmSubmit } from "@/components/ui/confirm-submit";
 import {
   addKelasAction,
+  deleteKelasAction,
   generateKelasAction,
 } from "@/lib/actions/admin";
 import { labelKelas, romanTingkat } from "@/lib/utils/tanggal";
@@ -52,8 +54,9 @@ export default async function KelasPage({
   const [jurusanRes, kelasRes, siswaRes] = await Promise.all([
     supabase
       .from("jurusan")
-      .select("id,kode,nama,kelas_per_tingkat,is_active")
-      .eq("is_active", true)
+      .select(
+        "id,kode,nama,jumlah_kelas_10,jumlah_kelas_11,jumlah_kelas_12,is_active",
+      )
       .order("kode"),
     active
       ? supabase
@@ -73,6 +76,7 @@ export default async function KelasPage({
   ]);
 
   const jurusan = (jurusanRes.data ?? []) as Jurusan[];
+  const jurusanAktif = jurusan.filter((item) => item.is_active);
   const kelas = (kelasRes.data ?? []) as unknown as KelasRow[];
   const counts = new Map<string, number>();
   for (const row of (siswaRes.data ?? []) as Array<{ kelas_id: string }>) {
@@ -80,10 +84,33 @@ export default async function KelasPage({
   }
 
   const byTingkat = new Map<number, KelasRow[]>();
+  const perJurusanTingkat = new Map<string, number>();
   for (const row of kelas) {
     const list = byTingkat.get(row.tingkat) ?? [];
     list.push(row);
     byTingkat.set(row.tingkat, list);
+
+    const key = `${row.jurusan_id}|${row.tingkat}`;
+    perJurusanTingkat.set(key, (perJurusanTingkat.get(key) ?? 0) + 1);
+  }
+
+  // Kelas yang jumlahnya melebihi konfigurasi di menu Jurusan.
+  const kelebihan: string[] = [];
+  for (const item of jurusan) {
+    for (const tingkat of [10, 11, 12] as const) {
+      const ada = perJurusanTingkat.get(`${item.id}|${tingkat}`) ?? 0;
+      const konfigurasi =
+        tingkat === 10
+          ? item.jumlah_kelas_10
+          : tingkat === 11
+            ? item.jumlah_kelas_11
+            : item.jumlah_kelas_12;
+      if (ada > konfigurasi) {
+        kelebihan.push(
+          `${romanTingkat(tingkat)} ${item.kode}: ${ada} kelas, konfigurasi ${konfigurasi}`,
+        );
+      }
+    }
   }
 
   return (
@@ -94,6 +121,24 @@ export default async function KelasPage({
       />
 
       <Flash ok={params.ok} error={params.error} />
+
+      {kelebihan.length > 0 ? (
+        <div className="card mb-4 border-[var(--alpha)] p-4">
+          <p className="flex items-center gap-2 font-semibold">
+            <Icon name="alert" className="h-4 w-4" />
+            Jumlah kelas melebihi pengaturan jurusan
+          </p>
+          <ul className="muted mt-1 list-inside list-disc space-y-0.5 text-sm">
+            {kelebihan.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          <p className="muted mt-2 text-xs">
+            Buka menu Jurusan lalu ubah jumlah kelasnya, atau hapus kelas
+            berlebih di atas (bila masih kosong).
+          </p>
+        </div>
+      ) : null}
 
       {tahunAjaran.length === 0 ? (
         <div className="card">
@@ -157,18 +202,39 @@ export default async function KelasPage({
                         {rows.map((row) => (
                           <div
                             key={row.id}
-                            className="rounded-lg border px-3 py-2"
+                            className="flex items-start justify-between gap-2 rounded-lg border px-3 py-2"
                           >
-                            <p className="text-sm font-semibold">
-                              {labelKelas({
-                                tingkat: row.tingkat,
-                                jurusan_kode: row.jurusan?.kode ?? "-",
-                                nomor: row.nomor,
-                              })}
-                            </p>
-                            <p className="muted text-xs">
-                              {counts.get(row.id) ?? 0} siswa
-                            </p>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold">
+                                {labelKelas({
+                                  tingkat: row.tingkat,
+                                  jurusan_kode: row.jurusan?.kode ?? "-",
+                                  nomor: row.nomor,
+                                })}
+                              </p>
+                              <p className="muted text-xs">
+                                {counts.get(row.id) ?? 0} siswa
+                              </p>
+                            </div>
+                            <form action={deleteKelasAction}>
+                              <input type="hidden" name="id" value={row.id} />
+                              <input
+                                type="hidden"
+                                name="ta"
+                                value={active?.id ?? ""}
+                              />
+                              <ConfirmSubmit
+                                className="btn btn-ghost btn-sm !min-h-8 !w-8 !px-0"
+                                title="Hapus kelas"
+                                message={`Hapus kelas ${labelKelas({
+                                  tingkat: row.tingkat,
+                                  jurusan_kode: row.jurusan?.kode ?? "-",
+                                  nomor: row.nomor,
+                                })}? Kelas hanya bisa dihapus bila belum berisi siswa.`}
+                              >
+                                <Icon name="trash" className="h-4 w-4" />
+                              </ConfirmSubmit>
+                            </form>
                           </div>
                         ))}
                       </div>
@@ -219,7 +285,7 @@ export default async function KelasPage({
                       required
                     >
                       <option value="">Pilih jurusan</option>
-                      {jurusan.map((item) => (
+                      {jurusanAktif.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.kode} — {item.nama}
                         </option>

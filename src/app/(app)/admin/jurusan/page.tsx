@@ -4,11 +4,66 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Flash } from "@/components/ui/flash";
 import { Icon } from "@/components/ui/icons";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { saveJurusanAction } from "@/lib/actions/admin";
+import { ConfirmSubmit } from "@/components/ui/confirm-submit";
+import {
+  deleteJurusanAction,
+  saveJurusanAction,
+} from "@/lib/actions/admin";
 import { romanTingkat } from "@/lib/utils/tanggal";
 import type { Jurusan } from "@/types/db";
 
 export const dynamic = "force-dynamic";
+
+const TINGKAT: Array<{ nilai: 10 | 11 | 12; label: string }> = [
+  { nilai: 10, label: "Kelas X (tingkat 10)" },
+  { nilai: 11, label: "Kelas XI (tingkat 11)" },
+  { nilai: 12, label: "Kelas XII (tingkat 12)" },
+];
+
+function jumlah(item: Jurusan, tingkat: 10 | 11 | 12): number {
+  if (tingkat === 10) return item.jumlah_kelas_10;
+  if (tingkat === 11) return item.jumlah_kelas_11;
+  return item.jumlah_kelas_12;
+}
+
+/** Contoh nama kelas: "X RPL 1–2", "XII RPL 1–3"; 0 = tanpa kelas. */
+function contohKelas(item: Pick<Jurusan, "kode">, tingkat: 10 | 11 | 12, n: number) {
+  if (n <= 0) return `${romanTingkat(tingkat)} ${item.kode} tanpa kelas`;
+  return n === 1
+    ? `${romanTingkat(tingkat)} ${item.kode} 1`
+    : `${romanTingkat(tingkat)} ${item.kode} 1–${n}`;
+}
+
+function FieldJumlah({
+  id,
+  name,
+  label,
+  defaultValue,
+}: {
+  id: string;
+  name: string;
+  label: string;
+  defaultValue: number;
+}) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        name={name}
+        type="number"
+        min={0}
+        max={20}
+        defaultValue={defaultValue}
+        className="input"
+        required
+      />
+      <p className="muted mt-1 text-xs">0 = tingkat ini tanpa kelas</p>
+    </div>
+  );
+}
 
 export default async function JurusanPage({
   searchParams,
@@ -21,7 +76,9 @@ export default async function JurusanPage({
 
   const { data } = await supabase
     .from("jurusan")
-    .select("id,kode,nama,kelas_per_tingkat,is_active,created_at")
+    .select(
+      "id,kode,nama,jumlah_kelas_10,jumlah_kelas_11,jumlah_kelas_12,is_active,created_at",
+    )
     .order("kode");
 
   const jurusan = (data ?? []) as Jurusan[];
@@ -30,16 +87,20 @@ export default async function JurusanPage({
     <div>
       <PageHeader
         title="Jurusan"
-        description="Kode jurusan dipakai untuk menyusun nama kelas, misalnya X RPL 1."
+        description="Kode jurusan dipakai untuk menyusun nama kelas, misalnya X RPL 1. Jumlah kelas boleh berbeda tiap tingkat."
       />
 
       <Flash ok={params.ok} error={params.error} />
 
       <section className="card mb-4 p-4">
-        <h2 className="section-title mb-3">Tambah jurusan</h2>
+        <h2 className="section-title mb-1">Tambah jurusan</h2>
+        <p className="muted mb-3 text-xs">
+          Isi jumlah rombongan kelas untuk masing-masing tingkat. Contoh: X 2,
+          XI 2, XII 3.
+        </p>
         <form
           action={saveJurusanAction}
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         >
           <div>
             <label className="label" htmlFor="kode">
@@ -54,7 +115,7 @@ export default async function JurusanPage({
               required
             />
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-1">
             <label className="label" htmlFor="nama">
               Nama jurusan
             </label>
@@ -67,23 +128,17 @@ export default async function JurusanPage({
               required
             />
           </div>
-          <div>
-            <label className="label" htmlFor="kelas_per_tingkat">
-              Kelas / tingkat
-            </label>
-            <input
-              id="kelas_per_tingkat"
-              name="kelas_per_tingkat"
-              type="number"
-              min={1}
-              max={20}
-              defaultValue={3}
-              className="input"
-              required
-            />
-          </div>
           <input type="hidden" name="is_active" value="1" />
-          <div className="sm:col-span-2 lg:col-span-4">
+          {TINGKAT.map((t) => (
+            <FieldJumlah
+              key={t.nilai}
+              id={`jumlah_kelas_${t.nilai}`}
+              name={`jumlah_kelas_${t.nilai}`}
+              label={t.label}
+              defaultValue={3}
+            />
+          ))}
+          <div className="sm:col-span-2 lg:col-span-3">
             <SubmitButton className="btn btn-primary">
               <Icon name="plus" className="h-4 w-4" />
               Simpan jurusan
@@ -109,7 +164,8 @@ export default async function JurusanPage({
                   {item.nama}
                 </span>
                 <span className="muted text-xs">
-                  {item.kelas_per_tingkat} kelas / tingkat
+                  X {item.jumlah_kelas_10} · XI {item.jumlah_kelas_11} · XII{" "}
+                  {item.jumlah_kelas_12} kelas
                 </span>
                 <span
                   className={
@@ -126,7 +182,7 @@ export default async function JurusanPage({
 
               <form
                 action={saveJurusanAction}
-                className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4"
+                className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3"
               >
                 <input type="hidden" name="id" value={item.id} />
                 <div>
@@ -139,7 +195,7 @@ export default async function JurusanPage({
                     required
                   />
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <label className="label">Nama jurusan</label>
                   <input
                     name="nama"
@@ -149,19 +205,7 @@ export default async function JurusanPage({
                     required
                   />
                 </div>
-                <div>
-                  <label className="label">Kelas / tingkat</label>
-                  <input
-                    name="kelas_per_tingkat"
-                    type="number"
-                    min={1}
-                    max={20}
-                    defaultValue={item.kelas_per_tingkat}
-                    className="input"
-                    required
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 self-end pb-2 text-sm">
                   <input
                     type="checkbox"
                     name="is_active"
@@ -171,7 +215,16 @@ export default async function JurusanPage({
                   />
                   Aktif (dipakai saat membuat kelas baru)
                 </label>
-                <div className="sm:col-span-2 lg:col-span-4">
+                {TINGKAT.map((t) => (
+                  <FieldJumlah
+                    key={t.nilai}
+                    id={`edit_jumlah_kelas_${t.nilai}`}
+                    name={`jumlah_kelas_${t.nilai}`}
+                    label={t.label}
+                    defaultValue={jumlah(item, t.nilai)}
+                  />
+                ))}
+                <div className="sm:col-span-2 lg:col-span-3">
                   <SubmitButton className="btn btn-primary btn-sm">
                     Simpan perubahan
                   </SubmitButton>
@@ -180,10 +233,21 @@ export default async function JurusanPage({
 
               <p className="muted mt-3 text-xs">
                 Kelas yang dibuat:{" "}
-                {[10, 11, 12]
-                  .map((tingkat) => `${romanTingkat(tingkat)} ${item.kode} 1–${item.kelas_per_tingkat}`)
-                  .join(", ")}
+                {TINGKAT.map((t) =>
+                  contohKelas(item, t.nilai, jumlah(item, t.nilai)),
+                ).join(", ")}
               </p>
+
+              <form action={deleteJurusanAction} className="mt-3 border-t pt-3">
+                <input type="hidden" name="id" value={item.id} />
+                <ConfirmSubmit
+                  className="btn btn-danger btn-sm"
+                  message={`Hapus jurusan ${item.kode}? Jurusan hanya bisa dihapus bila belum ada siswa di kelasnya.`}
+                >
+                  <Icon name="trash" className="h-4 w-4" />
+                  Hapus jurusan
+                </ConfirmSubmit>
+              </form>
             </details>
           ))
         )}

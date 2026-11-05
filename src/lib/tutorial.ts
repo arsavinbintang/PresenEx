@@ -17,6 +17,34 @@ export interface TutorialBab {
 
 const ADMIN: TutorialBab[] = [
   {
+    id: "cepat",
+    judul: "Mulai dari Sini",
+    ikon: "star",
+    ringkasan: "5 langkah pertama supaya aplikasi siap dipakai.",
+    blok: [
+      {
+        judul: "5 langkah pertama",
+        langkah: [
+          "Buat tahun ajaran: menu Tahun ajaran → Tambah (misal 2026/2027). Tahun ajaran pertama otomatis aktif.",
+          "Susun kelas: menu Jurusan → isi jumlah kelas tiap tingkat (boleh berbeda, misal X 2, XI 2, XII 3) → menu Kelas → Generate kelas.",
+          "Masukkan siswa: menu Siswa → Impor CSV (unduh template dulu), atau Tambah satu per satu bila siswanya sedikit.",
+          "Buat ekskul dan PIC: menu Ekskul → Tambah ekskul, lalu menu Pengguna → Buat akun untuk PIC-nya.",
+          "Mulai absensi: menu Absensi → pilih ekskul → isi status tiap siswa → Simpan. Selesai, sisanya menyusul.",
+        ],
+        catatan:
+          "Urutan lain boleh. Yang penting tahun ajaran dan kelas sudah ada sebelum siswa dimasukkan.",
+      },
+      {
+        judul: "Agar makin lengkap",
+        poin: [
+          "Logo sekolah dan logo sponsor: menu Pengaturan → Tampilan.",
+          "Absensi ikut tersalin ke Google Sheets: menu Sinkronisasi (lihat bab Google Sheets).",
+          "Cara pakai tiap menu ada di bab-bab berikutnya. Buka kapan saja lewat menu Bantuan → Tutorial.",
+        ],
+      },
+    ],
+  },
+  {
     id: "mulai",
     judul: "Mulai & Tampilan",
     ikon: "dashboard",
@@ -41,9 +69,9 @@ const ADMIN: TutorialBab[] = [
       {
         judul: "Mode terang / mode gelap",
         langkah: [
-          "Tekan ikon matahari/bulan/monitor di sidebar (atau di header atas pada HP).",
-          "Urutannya: Ikut sistem → Mode terang → Mode gelap → ulang.",
-          "Pilihan tersimpan di perangkat tersebut. Admin juga bisa mengatur tema bawaan semua pengguna lewat menu Pengaturan.",
+          "Tekan ikon matahari (mode terang) atau bulan (mode gelap) di sidebar — atau di header atas pada HP.",
+          "Tombolnya langsung berpindah terang ↔ gelap, tanpa pilihan lain.",
+          "Pilihan tersimpan di perangkat tersebut. Admin juga bisa mengatur tema bawaan semua pengguna lewat menu Pengaturan → Tampilan.",
         ],
       },
       {
@@ -64,10 +92,19 @@ const ADMIN: TutorialBab[] = [
       {
         judul: "Membuat akun",
         langkah: [
-          "Buka menu Pengguna → Tambah pengguna.",
+          "Buka menu Pengguna → isi formulir Buat akun di bagian atas halaman.",
           "Isi username (huruf kecil, tanpa spasi), nama lengkap, dan password.",
           "Pilih peran: admin (akses penuh) atau pic (hanya ekskul yang ditugaskan).",
-          "Tekan Simpan. Username harus unik.",
+          "Tekan Buat akun. Username harus unik.",
+        ],
+      },
+      {
+        judul: "Mengubah data pengguna",
+        langkah: [
+          "Tekan nama pengguna pada daftar untuk membuka detailnya.",
+          "Ubah nama lengkap atau peran (admin/PIC) lalu tekan Simpan nama & peran.",
+          "Ganti password lewat kolom Reset password, atau nonaktifkan akun supaya tidak bisa login.",
+          "Anda tidak bisa menurunkan peran diri sendiri sebagai admin terakhir.",
         ],
       },
       {
@@ -99,7 +136,7 @@ const ADMIN: TutorialBab[] = [
         poin: [
           "Tahun ajaran adalah wadah kelas, siswa, dan absensi supaya data tiap tahun tidak tercampur.",
           "Hanya satu tahun ajaran yang aktif. Data baru (siswa, kelas, absensi) selalu masuk ke tahun ajaran aktif.",
-          "Alurnya: buat tahun ajaran → generate kelas → masukkan siswa → rollover saat tahun berganti → arsipkan.",
+          "Alurnya: buat tahun ajaran → generate kelas → masukkan siswa → naik kelas saat tahun berganti → nonaktifkan tahun ajaran lama.",
         ],
       },
       {
@@ -114,10 +151,10 @@ const ADMIN: TutorialBab[] = [
       {
         judul: "Jurusan & kelas",
         langkah: [
-          "Menu Jurusan → tambah jurusan (misal TKJ, TKR).",
-          "Menu Kelas → pilih tahun ajaran lalu tekan Generate untuk membuat kelas 10/11/12 seluruh jurusan sekaligus.",
-          "Bisa juga menambah kelas satu per satu. Jumlah rombongan per kelas diatur di Pengaturan.",
-          "Kelas kosong bisa dihapus; kelas berisi siswa harus dikosongkan dulu.",
+          "Menu Jurusan → tambah jurusan (misal TKJ, TKR), lalu isi jumlah kelas tiap tingkat. Tiap tingkat boleh beda, misal X 2 kelas, XI 2 kelas, XII 3 kelas.",
+          "Menu Kelas → pilih tahun ajaran lalu tekan Generate kelas untuk membuat seluruh kombinasi jurusan × tingkat sekaligus.",
+          "Bisa juga menambah kelas satu per satu, atau menghapus kelas yang masih kosong.",
+          "Kalau muncul peringatan jumlah kelas melebihi pengaturan, ubah angkanya di menu Jurusan lalu Generate lagi.",
         ],
       },
       {
@@ -130,15 +167,15 @@ const ADMIN: TutorialBab[] = [
         ],
       },
       {
-        judul: "Rollover (kenaikan kelas)",
+        judul: "Naik kelas tahun ajaran (rollover)",
         langkah: [
-          "Buka menu Tahun ajaran → Rollover ke tahun ajaran baru.",
+          "Buka menu Tahun ajaran → bagian Naik kelas ke tahun ajaran baru.",
           "Isi nama dan periode tahun ajaran baru, centang salin anggota ekskul bila diperlukan.",
-          "Tekan Jalankan rollover. Kelas 10 → 11, kelas 11 → 12, kelas 12 lulus dengan NIS dikosongkan.",
-          "Tahun ajaran baru langsung aktif. Data pribadi siswa lulus otomatis dihapus setelah masa retensi (atur di Retensi).",
+          "Tekan Jalankan naik kelas. Kelas 10 → 11, kelas 11 → 12, kelas 12 lulus dengan NIS dikosongkan.",
+          "Tahun ajaran baru langsung aktif. Data pribadi siswa lulus otomatis dihapus setelah jadwal yang diatur di menu Hapus data lulus.",
         ],
         catatan:
-          "Rollover tidak bisa dibatalkan. Pastikan sudah yakin sebelum menekan tombolnya.",
+          "Naik kelas tidak bisa dibatalkan. Pastikan sudah yakin sebelum menekan tombolnya.",
       },
     ],
   },
@@ -159,16 +196,18 @@ const ADMIN: TutorialBab[] = [
       {
         judul: "Mengelola anggota",
         langkah: [
-          "Buka ekskul → tab anggota → Tambah anggota.",
-          "Pilih siswa dan tanggal bergabung (default hari ini).",
-          "Anggota yang sudah keluar (left) tidak dihitung pada sesi baru, tetapi riwayat lamanya tetap ada.",
+          "Buka ekskul → bagian Tambah anggota.",
+          "Ketik nama, NIS, atau kelas siswa; pilih dari hasil pencarian (maksimal 20 hasil), lalu tekan Tambah anggota.",
+          "Untuk mengeluarkan, tekan ikon silang pada baris anggota. Riwayat absensinya tetap tersimpan.",
+          "PIC ekskul boleh mengelola anggota ekskulnya sendiri; admin boleh mengelola semua ekskul.",
         ],
       },
       {
-        judul: "Mengarsipkan ekskul",
+        judul: "Menonaktifkan ekskul",
         poin: [
-          "Arsip membuat ekskul tidak lagi muncul di daftar aktif dan tidak ada sesi baru.",
-          "Data absensi lama tidak dihapus. Ekskul bisa diaktifkan kembali kapan saja.",
+          "Nonaktifkan membuat ekskul tidak lagi muncul di daftar absensi dan tidak ada sesi baru.",
+          "Data absensi lama tidak dihapus dan ekskul bisa diaktifkan kembali kapan saja.",
+          "Menghapus ekskul permanen hanya bisa bila belum ada absensi sama sekali.",
         ],
       },
     ],
@@ -320,7 +359,7 @@ const ADMIN: TutorialBab[] = [
           "Jendela koreksi PIC: berapa bulan ke belakang yang boleh diubah PIC (admin selalu bebas).",
           "Masa retensi: berapa bulan setelah lulus data pribadi + absensi siswa dihapus.",
           "Label status hadir/izin/sakit/alpha bisa diganti (misal: Alfa).",
-          "Jumlah rombongan kelas default dan daftar tanggal libur nasional.",
+          "Daftar tanggal libur nasional. Jumlah kelas tiap tingkat diatur di menu Jurusan, bukan di sini.",
         ],
       },
       {
@@ -336,7 +375,7 @@ const ADMIN: TutorialBab[] = [
         poin: [
           "Kurangi jumlah ekskul aktif yang tidak terpakai (arsipkan).",
           "Gunakan filter tanggal yang lebih pendek di laporan.",
-          "Bersihkan data lewat menu Retensi bila siswa lulus sudah menumpuk.",
+          "Bersihkan data lewat menu Hapus data lulus bila siswa lulus sudah menumpuk.",
         ],
       },
     ],
@@ -344,6 +383,31 @@ const ADMIN: TutorialBab[] = [
 ];
 
 const PIC: TutorialBab[] = [
+  {
+    id: "cepat",
+    judul: "Mulai dari Sini",
+    ikon: "star",
+    ringkasan: "Langkah singkat mengisi absensi pertama kali.",
+    blok: [
+      {
+        judul: "Tiga langkah pertama",
+        langkah: [
+          "Login memakai username dan password yang diberikan admin.",
+          "Buka menu Absensi → pilih ekskul Anda → periksa tanggalnya (default hari ini).",
+          "Pilih status tiap siswa (Hadir, Izin, Sakit, Alpha) lalu tekan Simpan.",
+        ],
+      },
+      {
+        judul: "Yang perlu diketahui",
+        poin: [
+          "Anggota ekskul Anda bisa ditambah/dikeluarkan sendiri: buka halaman ekskul → Tambah anggota → ketik nama siswa.",
+          "Rekap kehadiran dan unduhan CSV ada di menu Laporan.",
+          "Salah pilih status? Buka lagi absensi tanggal itu lalu ubah — semua perubahan tercatat.",
+          "Ada yang tidak beres? Hubungi admin sekolah.",
+        ],
+      },
+    ],
+  },
   {
     id: "mulai",
     judul: "Mulai & Tampilan",
@@ -361,7 +425,7 @@ const PIC: TutorialBab[] = [
         judul: "Akses Anda",
         poin: [
           "PIC hanya melihat dan mengelola ekskul yang ditugaskan admin ke Anda.",
-          "Anda bisa mengisi absensi, melihat laporan, dan melihat detail siswa pada ekskul tersebut.",
+          "Anda bisa mengisi absensi, mengatur anggota, melihat laporan, dan melihat detail siswa pada ekskul tersebut.",
           "Menu data siswa, pengguna, dan pengaturan tidak tersedia untuk PIC.",
         ],
       },
@@ -375,8 +439,8 @@ const PIC: TutorialBab[] = [
       {
         judul: "Mode terang / mode gelap",
         langkah: [
-          "Tekan ikon matahari/bulan/monitor di sidebar (atau header pada HP).",
-          "Urutannya: Ikut sistem → Mode terang → Mode gelap.",
+          "Tekan ikon matahari (mode terang) atau bulan (mode gelap) di sidebar, atau di header pada HP.",
+          "Tombolnya langsung berpindah terang ↔ gelap, tanpa pilihan lain.",
           "Pilihan tersimpan di perangkat Anda.",
         ],
       },
@@ -419,6 +483,15 @@ const PIC: TutorialBab[] = [
         poin: [
           "Absensi tetap tersimpan walau pengiriman ke Google Sheets gagal.",
           "Data masuk antrean dan dikirim ulang otomatis, jadi tidak perlu mengulang simpan.",
+        ],
+      },
+      {
+        judul: "Anggota ekskul",
+        langkah: [
+          "Buka halaman ekskul Anda, lalu bagian Tambah anggota.",
+          "Ketik nama, NIS, atau kelas siswa — hasil pencarian maksimal 20 siswa — pilih satu, lalu tekan Tambah anggota.",
+          "Mengeluarkan anggota: tekan ikon silang pada barisnya. Riwayat absensinya tetap tersimpan.",
+          "Anda hanya bisa mengelola anggota di ekskul yang ditugaskan kepada Anda.",
         ],
       },
     ],
